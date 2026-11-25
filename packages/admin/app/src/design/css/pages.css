@@ -128,3 +128,41 @@
 .cmt-on + .composer { border-block-start: 0; }
 .cmt-on-t { min-width: 0; overflow-wrap: anywhere; }
 .composer-pop { min-width: 0; }
+
+/* Map the rest (network N1, /systems/map): the pasted links, the manifest's and a GitHub owner's repos as a table to tick. */
+.mapr { display: flex; flex-direction: column; gap: var(--sp-12); }
+.mapr section { display: flex; flex-direction: column; gap: var(--sp-6); min-width: 0; }
+.mapr textarea { inline-size: 100%; font-family: var(--mono); }
+.mapr-table { inline-size: 100%; border-collapse: collapse; font-size: var(--fs-body); }
+.mapr-table th, .mapr-table td { padding: var(--sp-4) var(--sp-6); border-block-end: var(--rule-w) solid var(--rule); text-align: start; vertical-align: top; }
+.mapr-label { display: block; margin-block-end: var(--sp-3); font-size: var(--fs-meta); color: var(--mute); }
+.mapr-link { min-width: 0; overflow-wrap: anywhere; color: var(--mute); }
+.mapr-extra { display: flex; flex-wrap: wrap; gap: var(--sp-4) var(--sp-8); margin-block-start: var(--sp-3); }
+.mapr-stage { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-6); }
+
+/* The Federation page (network N2 Task 13, /federation): each network, migration row and request as a raised item (the
+   deploy steps' surface), a second line of mute facts, a row of actions; the drift lines as a plain list, the urgent
+   ones (a record federation.yaml no longer allows) in clay; the one-time invite link in a Mono well that wraps. */
+.fed-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-8); min-width: 0; }
+.fed-item { display: grid; gap: var(--sp-5); min-width: 0; padding: var(--sp-9) var(--sp-10); background: var(--raised);
+  border: var(--rule-w) solid var(--rule); border-radius: var(--radius); }
+.fed-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--sp-3) var(--sp-8); min-width: 0; }
+.fed-head > .smark { margin-inline-start: auto; }
+.fed-t { font: var(--fw-medium) var(--fs-body)/var(--lh-row) var(--sans); color: var(--ink); overflow-wrap: anywhere; }
+.fed-k { min-width: 0; font-size: var(--fs-meta); color: var(--mute); overflow-wrap: anywhere; }
+.fed-line, .fed-said { margin: 0; font-size: var(--fs-meta); line-height: var(--lh-row); color: var(--mute); overflow-wrap: anywhere; }
+.fed-said { color: var(--ink); }
+.fed-line + .fed-list, .fed-list + .fed-line { margin-block-start: var(--sp-6); }
+.fed-acts { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-4) var(--sp-8); min-width: 0; }
+.fed-acts .input { inline-size: auto; flex: 1 1 var(--w-aside); min-width: 0; max-inline-size: var(--w-ed-min); }
+.fed-foot { margin-block-start: var(--sp-8); }
+.fed-drift { list-style: none; margin: var(--sp-8) 0 0; padding: 0; display: grid; gap: var(--sp-5); min-width: 0; }
+.fed-drift > li { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3) var(--sp-8); min-width: 0; font-size: var(--fs-meta); }
+.fed-drift-t { flex: 1 1 var(--w-slash); min-width: 0; color: var(--ink); overflow-wrap: anywhere; }
+.fed-urgent > .fed-drift-t { color: var(--attn); }
+.fed-form { display: grid; gap: var(--sp-8); min-width: 0; max-inline-size: var(--w-palette); }
+.fed-choices { display: grid; gap: var(--sp-4); min-width: 0; }
+.fed-link { margin: 0; overflow-wrap: anywhere; word-break: break-all; }
+.fed-field-l { font-size: var(--fs-meta); color: var(--mute); }
+.fed-import { position: relative; cursor: pointer; }
+.fed-import:focus-within { outline: var(--focus-w) solid var(--focus); outline-offset: var(--focus-w); }

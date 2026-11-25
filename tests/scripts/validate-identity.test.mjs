@@ -55,9 +55,8 @@ function setupInstance({
   name: ${federationName}
   type: Project
   role: standalone
-federation:
-  network: test
-  hub: null
+network: test
+hub: null
 agent:
   runtime: claude-code
 metadata:

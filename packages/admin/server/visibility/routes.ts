@@ -19,7 +19,7 @@ import { chainKept } from '../deploy/private-flip.ts'
 import type { SystemReader } from '../systems/reader.ts'
 import { readConfig, type VisibilityPolicy } from './config.ts'
 import { isObj, Levels, MEMBERS_ONLY, PUBLIC_VIEWER } from './gate.ts'
-import { admits, hatsAbove, parseLevel, type Viewer } from '../../lib/visibility.mjs'
+import { admits, hatsAbove, NEVER_WIDENED, parseLevel, type Viewer } from '../../lib/visibility.mjs'
 import { atTheMachine, isAtTheMachine } from '../workspace/reads.ts'
 import { hatRef, inTree, parseHatRef, parseTreeRef } from '../../lib/hats.mjs'
 
@@ -97,7 +97,7 @@ function readsTree(d: VisibilityDeps, viewer: Viewer, config: VisibilityPolicy, 
   } catch { return false }
 }
 
-const GIT_COLLECTIONS = REGISTRIES.filter(r => r.kind === 'collection' && !r.ledger).map(r => r.name)
+const GIT_COLLECTIONS = REGISTRIES.filter(r => r.kind === 'collection' && !r.ledger && !NEVER_WIDENED.includes(r.name)).map(r => r.name)
 
 /** The collections `viewer` may write (Q77's one predicate, `mayWrite`): git's, then the private store's they are admitted
  *  to. A store that cannot be reached lists none of its own. */

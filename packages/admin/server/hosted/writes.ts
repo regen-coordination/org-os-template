@@ -23,7 +23,7 @@ export interface HostedWrite {
   path: string
   class: WriteClass
   /** For `off` only. */
-  code?: 'HOSTED_OFF' | 'ONE_WRITER' | 'CLAIM_HOSTED'
+  code?: 'HOSTED_OFF' | 'ONE_WRITER' | 'CLAIM_HOSTED' | 'NETWORK_HOSTED'
   sentence?: string
 }
 
@@ -31,13 +31,16 @@ export interface HostedWrite {
 export const HOSTED_OFF = 'This runs a command on the server, which a hosted Hub does not do for anyone. Run it from a maintainer\'s clone of the repository.'
 export const ONE_WRITER = 'The Hub is the only writer to this repository, so there is nothing to sync. Its commits reach the remote by themselves.'
 export const CLAIM_HOSTED = 'A claim ties this machine\'s git identity to a member, and a hosted Hub has none. Members sign in with their wallet.'
+/** The network's writes (federation requests, invites, the join policy, the migration): hosted federation has not had a
+ *  security review of its own yet, so a hosted Hub makes none of them (replay ruling I1). */
+export const NETWORK_HOSTED = 'Network requests and invites are made from the organization\'s own Hub on its machine, not a hosted one, for now.'
 export const HOSTED_UNLISTED = 'This change cannot be made on a hosted Hub yet. Nothing was written.'
 
 /** The status each refusal answers with. */
-const STATUS = { HOSTED_OFF: 403, ONE_WRITER: 409, CLAIM_HOSTED: 403 } as const
+const STATUS = { HOSTED_OFF: 403, ONE_WRITER: 409, CLAIM_HOSTED: 403, NETWORK_HOSTED: 403 } as const
 
 const off = (method: HostedWrite['method'], path: string, code: NonNullable<HostedWrite['code']>): HostedWrite =>
-  ({ method, path, class: 'off', code, sentence: { HOSTED_OFF, ONE_WRITER, CLAIM_HOSTED }[code] })
+  ({ method, path, class: 'off', code, sentence: { HOSTED_OFF, ONE_WRITER, CLAIM_HOSTED, NETWORK_HOSTED }[code] })
 const as = (cls: Exclude<WriteClass, 'off'>) => (method: HostedWrite['method'], path: string): HostedWrite => ({ method, path, class: cls })
 const actor = as('actor'), perMember = as('per-member'), session = as('session'), read = as('read')
 
@@ -52,6 +55,17 @@ export const HOSTED_WRITES: readonly HostedWrite[] = [
   // The claim ties this machine's git address to a member; hosted actors sign in.
   off('POST', '/api/bootstrap/claim/plan', 'CLAIM_HOSTED'),
   off('POST', '/api/bootstrap/claim/confirm', 'CLAIM_HOSTED'),
+  // The network (federation/routes.ts): asking, withdrawing, recording, the join policy, the migration, receiving,
+  // deciding and invites. Each asks for its actor, but hosted federation has had no security review of its own: off.
+  off('POST', '/api/federation/ask', 'NETWORK_HOSTED'),
+  off('POST', '/api/federation/outgoing/:id/withdraw', 'NETWORK_HOSTED'),
+  off('POST', '/api/federation/outgoing/:id/clear', 'NETWORK_HOSTED'),
+  off('POST', '/api/federation/outgoing/:id/record', 'NETWORK_HOSTED'),
+  off('POST', '/api/federation/join', 'NETWORK_HOSTED'),
+  off('POST', '/api/federation/migration', 'NETWORK_HOSTED'),
+  off('POST', '/api/federation/requests/receive', 'NETWORK_HOSTED'),
+  off('POST', '/api/federation/requests/:id/decide', 'NETWORK_HOSTED'),
+  off('POST', '/api/federation/invites', 'NETWORK_HOSTED'),
   // Kept apart per member by their routes (wizards/routes.ts, resources/routes.ts).
   perMember('PUT', '/api/wizards/:id/draft'),
   perMember('DELETE', '/api/wizards/:id/draft'),

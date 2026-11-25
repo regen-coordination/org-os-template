@@ -21,6 +21,8 @@ orgs (single-operator dogfood; external pilot is the open milestone). The config
 engine that does this is shipped and tested — it produced a real instance, bread-coop-os. No
 SaaS, no lock-in — markdown, YAML, and git.
 
+To open, create or adopt an instance from a page on your own machine, run `npm run open` (see [docs/OPENING.md](docs/OPENING.md)).
+
 ## How it's organized
 
 Three nouns. Everything else is detail.

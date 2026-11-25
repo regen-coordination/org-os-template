@@ -1,14 +1,36 @@
-import { existsSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
+import { join, normalize } from 'node:path'
+import { leadsOutside } from '../resources/mount.ts'
+import { readRegistry } from '../registry.ts'
+import { gitUrlProblem } from '../../launcher/git-write.ts'
 import { HttpError } from '../errors.ts'
 import { failingFileChecks } from '../resources/adapters/modules.ts'
 import { idOf, list, str } from '../resources/util.ts'
 import { readYamlObject } from '../resources/util.ts'
 import { fetchRemote, validBranchName } from '../git.ts'
+import { checkLinksAndRecords, lookupTarget } from '../federation/atproto/read.ts'
+import { networkFetch, networkLookup, networkResolveTxt } from '../net.ts'
+import { publishLinksOperation } from '../federation/atproto/publish.ts'
+import { federationNodeOperations } from '../federation/node.ts'
+import { federationHubOperations } from '../federation/hub.ts'
 import { resolveTrunk } from '../proposals/ledger.ts'
 import { kmsSrc } from '../knowledge/kms.ts'
 import { validTrunkName } from '../../lib/rules.mjs'
 import type { Kind, Resource } from '../resources/types.ts'
+import type { FetchLike } from '../systems/driver.ts'
+
+/** True when the instance's own .gitignore names the mount (or repos/ above it): read from the file, since an adopted repo keeps its own. */
+function mountIgnored(repo: string, mount: string): boolean {
+  let text: string
+  try { text = readFileSync(join(repo, '.gitignore'), 'utf8') } catch { return false }
+  const parts = mount.split('/')
+  const names = new Set<string>()
+  for (let n = 1; n <= parts.length; n++) {
+    const dir = parts.slice(0, n).join('/')
+    for (const f of [dir, `${dir}/`, `${dir}/*`, `${dir}/**`]) { names.add(f); names.add(`/${f}`) }
+  }
+  return text.split(/\r?\n/).some(l => names.has(l.trim()))
+}
 
 /** A command the executor spawns (never through a shell), and the repository paths it may change. */
 export interface Planned { cmd: string; args: string[]; writes: string[] }
@@ -21,6 +43,11 @@ export interface ParamsSchema {
   type: 'object'; additionalProperties: false
   properties?: Record<string, Record<string, unknown>>; required?: string[]
 }
+
+export type Refreshed = 'records' | 'modules' | 'crew' | 'fleet' | 'sources' | 'federation'
+
+/** The adapters to read again when `op` ends. */
+export const refreshedAdapters = (op: Pick<Operation, 'refreshes'>): Refreshed[] => [op.refreshes].flat()
 
 export interface Operation {
   id: string
@@ -37,12 +64,22 @@ export interface Operation {
   /** `ctx.startBranch` is the branch the server started on (the trunk when governance names none). A plan may be async. */
   plan: (r: Resource, params: Record<string, unknown>, repo: string, ctx?: { startBranch?: string }) => Planned | InProcess | Promise<Planned | InProcess>
   /** The adapter to read again when a job ends, because what it shows may have changed. */
-  refreshes: 'records' | 'modules' | 'crew' | 'fleet' | 'sources'
+  refreshes: Refreshed | Refreshed[]
 }
 
 /** The server asks for a confirmation (a planned nonce) before anything that changes a file or
  *  a running agent, and before anything that reaches the network. */
 export const needsConfirm = (op: Pick<Operation, 'effect' | 'network'>): boolean => op.effect === 'changes' || op.network
+
+const mountPath = (r: Resource): string | null => {
+  const m = r.facts.mount
+  return m && typeof m === 'object' && typeof (m as { path?: unknown }).path === 'string' ? (m as { path: string }).path : null
+}
+
+/** The System's entry in data/systems.yaml, read server-side. */
+const entryOf = (repo: string, r: Resource): Record<string, unknown> | null => {
+  try { return (readRegistry(repo, 'systems').entries ?? []).find(e => `system:${String(e.id)}` === r.id) ?? null } catch { return null }
+}
 
 const NO_PARAMS: ParamsSchema = { type: 'object', additionalProperties: false }
 const SEC = 1000
@@ -82,6 +119,49 @@ const unsafeId = (id: string) => `this id cannot be passed to crew safely: "${id
 /** The reason a crew call cannot take this resource's id, or null. */
 const idProblem = (r: Resource): string | null => (safeId(idOf(r.id)) === null ? unsafeId(idOf(r.id)) : null)
 const refuse = (problem: string | null): void => { if (problem !== null) throw new HttpError(409, `Not run: ${problem}.`) }
+
+/** What the two atproto operations reach the network with (ruling R12). A running server uses `LIVE`; the acceptance
+ *  pilot hands `startServer` a fake network in-process, which `catalogueWith` puts in their place. There is no switch, flag
+ *  or environment variable for it: `allowPlaceholderLexicons` reaches the publisher only through this object. */
+export interface OperationNetwork {
+  fetch: FetchLike
+  lookup: (host: string) => Promise<string[]>
+  resolveTxt: (name: string) => Promise<string[][]>
+  /** Lets the publisher write the `example.*` lexicons. Only tests and the acceptance pilot set it. */
+  allowPlaceholderLexicons?: boolean
+  /** Where the publisher reads `ATPROTO_APP_PASSWORD`. Default: the server's own environment. Two servers in one process
+   *  (the pilot) each get their own. */
+  env?: Record<string, string | undefined>
+}
+const LIVE: OperationNetwork = { fetch: networkFetch, lookup: networkLookup, resolveTxt: networkResolveTxt }
+
+/** `federation.check-links`, reading through `net`. */
+const checkLinksOperation = (net: OperationNetwork): Operation => ({
+  // N2 Tasks 2 and 3: read another instance's federation.json, and atproto records. With `address` it looks that one
+  // hub up (the Ask form's "Look it up"); with `did` or `handle`, that one account, checked both ways (migration's
+  // "Look it up"); without, every peer that has a url and no folder here, and every DID federation.yaml lists, this
+  // instance's own included, each from its own PDS. It writes only the caches, under stateDir, outside the
+  // repository, so the executor sees no changed file.
+  id: 'federation.check-links', kinds: ['instance'], label: () => 'Check links', effect: 'reads', network: true,
+  timeoutMs: 120 * SEC,
+  params: { type: 'object', additionalProperties: false, properties: {
+    address: { type: 'string', maxLength: 2048 }, did: { type: 'string', maxLength: 2048 }, handle: { type: 'string', maxLength: 253 },
+  } },
+  refreshes: 'fleet',
+  unavailable: r => (r.facts.self === true ? null : "offered on this instance's own card"),
+  plan: (_r, params) => {
+    const target = lookupTarget(params)
+    if ('problem' in target) throw new HttpError(422, target.problem)
+    const summary = target.kind === 'address' ? `read ${target.value}: a download, it changes no file`
+      : target.kind === 'did' ? `look up ${target.value} on atproto: a download, it changes no file`
+      : target.kind === 'handle' ? `look up ${target.value} on atproto, both ways: a download, it changes no file`
+      : "read the federation.json of each peer that has a url and no folder here, and the atproto records of every DID federation.yaml lists, this instance's own included: a download, it changes no file"
+    return {
+      summary,
+      inProcess: (repo, signal) => checkLinksAndRecords(repo, params, { fetch: net.fetch, lookup: net.lookup, resolveTxt: net.resolveTxt }, signal),
+    }
+  },
+})
 
 export const CATALOGUE: Operation[] = [
   {
@@ -201,6 +281,34 @@ export const CATALOGUE: Operation[] = [
     },
   },
   {
+    // Clone a repo System into its mount (network N1, R10): only under repos/, which the instance ignores in git. The url is
+    // checked by the launcher's rule and follows `--`; `ext::` transports are off. git refuses a non-empty folder itself.
+    id: 'system.clone', kinds: ['system'], label: () => 'Clone', effect: 'changes', network: true,
+    timeoutMs: 300 * SEC, params: NO_PARAMS, refreshes: 'records',
+    unavailable: (r, repo) => {
+      if (r.facts.kind !== 'repo') return 'Only a repo System can be cloned.'
+      const mount = mountPath(r)
+      if (mount === null) return 'This System has no mount to clone into.'
+      const norm = normalize(mount)
+      if (!/^repos\/[^/]/.test(norm) || norm.split(/[\\/]/).includes('..')) return 'Clone works for mounts under repos/, which the instance ignores in git.'
+      if (leadsOutside(repo, norm)) return `${norm} leads outside this instance.`
+      if (!mountIgnored(repo, norm)) return "Add repos/ to this instance's .gitignore first, so the clone stays out of its history."
+      try { if (readdirSync(join(repo, norm)).length > 0) return `${norm} is already there, with files in it.` } catch { /* not there: fine */ }
+      // The address comes from the registry here, never from the resource's facts (which every client reads).
+      const url = entryOf(repo, r)?.url
+      if (typeof url !== 'string' || url === '') return 'This System has no address to clone from.'
+      return gitUrlProblem(url)
+    },
+    plan: async (r, _p, repo) => {
+      const mount = normalize(mountPath(r) ?? '')
+      const entry = entryOf(repo, r)
+      // An absent branch means the remote's default: git is told no branch, so a repo whose default is master clones too.
+      const branch = str(entry?.branch)
+      if (branch !== null && !(await validBranchName(repo, branch))) throw new HttpError(409, `Not cloned: "${branch}" is not a branch name git accepts. Nothing was changed.`)
+      return { cmd: 'git', args: ['-c', 'protocol.ext.allow=never', 'clone', ...(branch !== null ? ['--branch', branch] : []), '--', String(entry?.url), join(repo, mount)], writes: [`${mount}/`] }
+    },
+  },
+  {
     id: 'instance.assess', kinds: ['instance'], label: () => 'Assess', effect: 'reads', network: false,
     timeoutMs: 180 * SEC, params: NO_PARAMS, refreshes: 'fleet',
     unavailable: (r, repo) => !existsSync(join(repo, 'scripts', 'doctor.mjs')) ? 'instance-doctor is not here (no scripts/doctor.mjs)'
@@ -242,6 +350,17 @@ export const CATALOGUE: Operation[] = [
       return { cmd: 'git', args: ['push', '--', 'origin', `refs/heads/${trunk}:refs/heads/${trunk}`], writes: [] }
     },
   },
+  checkLinksOperation(LIVE),
+  // N2 Task 7: publish this org's own link records, planned from federation.yaml on the trunk and written through its
+  // kms atproto session. Its plan reads only the cache of the last check; its job re-reads, re-plans and writes the
+  // network and a receipt under stateDir, never a file in the repository.
+  publishLinksOperation({ fetch: LIVE.fetch, lookup: LIVE.lookup, env: process.env }),
+  // N2 Task 8: the node's side of asking to join. Sending and following the answer are confirmed; they write only under
+  // stateDir. Neither publishes on atproto: that stays the separate, confirmed `federation.publish-links`.
+  ...federationNodeOperations(),
+  // N2 Task 9: the hub's side. Polling fills the inbox and replying keeps a receipt, both under stateDir; receiving and
+  // deciding are actor routes (server/federation/routes.ts). Neither publishes on atproto: `federation.publish-links` does.
+  ...federationHubOperations(),
   {
     id: 'connector.ingest', kinds: ['connector'], label: () => 'Ingest', effect: 'changes', network: true,
     timeoutMs: 600 * SEC, params: NO_PARAMS, refreshes: 'sources',
@@ -258,3 +377,12 @@ export const CATALOGUE: Operation[] = [
 ]
 
 export const opById = (id: string): Operation | undefined => CATALOGUE.find(o => o.id === id)
+
+/** The catalogue with `net` in place of the live network for the two atproto operations (ruling R12): every other
+ *  operation is the same object. `startServer({ network })` mounts it; nothing else does. */
+export function catalogueWith(net: OperationNetwork): Operation[] {
+  return CATALOGUE.map(op => op.id === 'federation.check-links' ? checkLinksOperation(net)
+    : op.id === 'federation.publish-links'
+      ? publishLinksOperation({ fetch: net.fetch, lookup: net.lookup, env: net.env ?? process.env, ...(net.allowPlaceholderLexicons ? { allowPlaceholderLexicons: true } : {}) })
+      : op)
+}

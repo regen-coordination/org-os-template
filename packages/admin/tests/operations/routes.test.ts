@@ -32,6 +32,7 @@ const CAT: Operation[] = [
     params: { type: 'object', additionalProperties: false, properties: { n: { type: 'integer' } } },
     variants: () => [{ label: 'Variant 0', params: { n: 0 }, unavailable: null }, { label: 'Variant 1', params: { n: 1 }, unavailable: 'no' }],
     plan: () => ({ inProcess: async () => '' }) },
+  { ...base, id: 'fake.done', label: () => 'Done', effect: 'reads', unavailable: () => 'Nothing to publish.', plan: () => ({ inProcess: async () => '' }) },
 ]
 
 beforeEach(() => {
@@ -55,6 +56,7 @@ describe('operation routes', () => {
     expect(ops.map((o: { id: string; label: string; confirm: boolean; unavailable: string | null }) => [o.id, o.label, o.confirm, o.unavailable])).toEqual([
       ['fake.change', 'Change', true, null], ['fake.read', 'Read', false, null], ['fake.slow', 'Slow', false, null],
       ['fake.never', 'Never', false, 'not on this machine'], ['fake.variants', 'Variant 0', false, null], ['fake.variants', 'Variant 1', false, 'no'],
+      ['fake.done', 'Done', false, 'Nothing to publish.'],
     ])
     expect(ops[4].preset).toEqual({ n: 0 })
   })
@@ -104,6 +106,8 @@ describe('operation routes', () => {
     const never = await post('/api/jobs', { op: 'fake.never', resource: 'module:a' })
     expect(never.status).toBe(409)
     expect((await never.json()).error).toBe('Not run: not on this machine.')
+    // A reason that is already a sentence keeps one period (N2 Task 7, review M4).
+    expect((await (await post('/api/jobs', { op: 'fake.done', resource: 'module:a' })).json()).error).toBe('Not run: Nothing to publish.')
   })
 
   it('runs a reading operation directly, lists jobs, and cancels', async () => {

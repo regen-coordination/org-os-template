@@ -23,6 +23,13 @@ Flags: `--repo <path>` (default: the directory you ran the command from),
 Binds 127.0.0.1 only. Who may read and change what is decided by the mode, sign-in and the org's levels
 (below).
 
+## Launcher
+
+`npm run open` (from the repo root) builds the admin and starts the launcher on http://localhost:4679/launch
+(`--port` changes it). From there you open an instance by folder or git address, create a new one, or adopt a repo
+that isn't org-os; each opened instance gets its own admin on the next free port from 4680. It writes only in the
+places spec §13 R7 lists, never pushes, and refuses to start in hosted mode. See `docs/OPENING.md`.
+
 ## Modes
 
 The same server runs in one of two modes, chosen at start (DAO-OS L5 spec §3):
@@ -310,11 +317,13 @@ A document registry's page links to the source editor (`/files/<path>`), where i
 | data/boards.yaml | Arrange and block settings on the board, and the source editor on the record page. |
 | data/proposals.yaml, the proposals ledger | Its own routes, by design: propose, approve, ratify and the rest write it, never an edit. |
 | data/library.yaml, the library’s receipts | Its own routes, by design: the library’s Add and Remove. |
+| data/federation-requests.yaml, the requests a hub received | Its own routes, by design: a request’s arrival and decision write it, never an edit. |
+| data/invites.yaml, the hub’s invites | Its own routes, by design: it holds hashes and `used_by`, so only the invite routes write it, never an edit. |
 | data/kb/, the knowledge commons’ canon | Its own routes: the commons’ entry page prepares an edit and applies it in one commit, under the org’s rules. |
 | pages/, the workspace’s pages | The page editor: a page is written in place, one commit per editing session; Suggest makes the edit a proposal. |
 | data/collections/, the records of the org’s own collections | The collection’s views and the record editor. |
 | the published files under .well-known/ | Generated from the data files, never edited (L8’s builder). |
-| data/finances.yaml; data/knowledge-manifest.yaml; data/imports.yaml, the imports’ record; IDENTITY.md; federation.yaml | The source editor (/files/<path>): the file edited whole, staged into your change, checked when staged and again when applied. |
+| data/finances.yaml; data/knowledge-manifest.yaml; data/imports.yaml, the imports’ record; IDENTITY.md; federation.yaml; federation/, the requests a node sends | The source editor (/files/<path>): the file edited whole, staged into your change, checked when staged and again when applied. |
 | data/governance.yaml, the rules | The source editor (/files/<path>): the file edited whole, staged into your change, checked when staged and again when applied. The governance check (§7.6) runs on it, so a text that would lock the org out is refused; the Rules page reads it. Its `roles` and `rules` are also a record of the change engine, `governance:governance` (see Governance below): a rule set's add writes them that way. |
 | data/visibility.yaml, what is public | The source editor (/files/<path>): the file edited whole, staged into your change, checked when staged and again when applied. Narrowing a record has its own route (L5); a text that widens what is public is a publication. |
 | an instance’s own data files outside the registry list, such as data/horizon.yaml and data/access-grants.yaml | The source editor (/files/<path>): the file edited whole, staged into your change, checked when staged and again when applied. Rules govern each as a record of the org. |

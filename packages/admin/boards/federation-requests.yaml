@@ -1,0 +1,12 @@
+# A built-in board (network N2 Task 10): the join requests this hub received, in four columns. `mutual` means accepted
+# by the hub; whether the link is published shows on the fleet card and the Federation page, not here. Members only.
+id: federation-requests
+name: Join requests
+audience: members
+layout: flow
+blocks:
+  - id: requests
+    type: kanban
+    title: Join requests
+    source: { kind: federation-request }
+    view: { group: status, columns: [requested, under-decision, mutual, refused] }

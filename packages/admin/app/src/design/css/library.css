@@ -166,6 +166,9 @@
 .wiz-lines li { display: flex; align-items: center; gap: var(--sp-6); min-width: 0; }
 .wiz-lines li > .i { flex: none; color: var(--ink); }
 /* done and failed: the outcome's tile beside what happened, its actions under it */
+.launcher-lines { color: inherit; }
+.launcher-missing { opacity: var(--o-disabled); }
+.launcher-door-h { font-size: inherit; }
 .wiz-out { display: flex; align-items: flex-start; gap: var(--sp-8); min-width: 0; }
 .wiz-out-b { display: grid; gap: var(--sp-6); align-content: start; flex: 1; min-width: 0; }
 .wiz-out .wiz-h { font-size: var(--fs-sub); font-weight: var(--fw-medium); letter-spacing: var(--ls-name); }

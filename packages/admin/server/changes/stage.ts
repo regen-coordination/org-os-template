@@ -323,13 +323,29 @@ export function idErrors(ops: StageOp[], entriesOf: (registry: string) => Entity
 export const LEDGER_SENTENCE = (registry: string): string =>
   `${registry} are changed by their own routes (Propose, and the buttons on a proposal), not by staging a change here; a hand edit of ${fileIn(REGISTRIES, registry)} is caught by validate:governance.`
 
+/** What is said when a change reaches for an entry of a create-only registry (`invites`): it holds a token's hash and who used it. */
+export const OWN_ROUTES_SENTENCE = (registry: string): string =>
+  `${registry} are created here but never changed or removed by hand: an entry holds who used it, and only the federation routes write that. Nothing was staged.`
+
+/** What is said when a change reaches for the hub's join requests (`federation-requests`): a ledger, but one the federation
+ *  routes write (receiving a request, Accept and Refuse on the Federation page), never Propose (replay M4). */
+export const FEDERATION_REQUESTS_SENTENCE = (registry: string): string =>
+  `${registry} are written only by the Federation page's own routes (receiving a request, Accept and Refuse), not by staging a change here or by hand. Nothing was staged.`
+
+/** The sentence for an op or a write aimed at ledger registry `registry`. */
+export const ledgerSentence = (registry: string): string =>
+  registry === 'federation-requests' ? FEDERATION_REQUESTS_SENTENCE(registry) : LEDGER_SENTENCE(registry)
+
 /** An op aimed at a ledger registry is refused: the ledger is written only by the proposal routes (spec §3.1).
  *  A record that names no registry is left for the checks that say so. */
 export function ledgerErrors(ops: StageOp[], defs: readonly RegistryDef[] = REGISTRIES): RecordError[] {
   return ops.filter(isRecordOp).flatMap((op): RecordError[] => {
     let registry: string
     try { registry = parseRecord(op.record, defs).registry } catch (err) { if (err instanceof StageError) return []; throw err }
-    return defs.find(d => d.name === registry)?.ledger ? [{ record: op.record, field: '', message: LEDGER_SENTENCE(registry) }] : []
+    const def = defs.find(d => d.name === registry)
+    if (def?.ledger) return [{ record: op.record, field: '', message: ledgerSentence(registry) }]
+    // A create-only registry (invites): `create` passes; anything else could reset `used_by`.
+    return def?.createOnly && op.op !== 'create' ? [{ record: op.record, field: '', message: OWN_ROUTES_SENTENCE(registry) }] : []
   })
 }
 

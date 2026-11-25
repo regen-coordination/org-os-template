@@ -9,6 +9,7 @@ description: "Repository relationship manifest for agent-native federated organi
 # CHANGELOG from v2.0:
 # - Added identity.emoji, identity.chain, identity.safe, identity.hats, identity.gardens
 # - Added federation.network, federation.hub, federation.peers (replaces simple upstream/downstream)
+#   (network N0: these are now written at the top level; a nested federation: block is still read, with a warning)
 # - Added agent section (runtime, skills, channels, proactive, heartbeat_interval)
 # - Added knowledge-commons section
 # - Version bump: "2.0" → "3.0", spec: "organizational-os/2.0" → "organizational-os/3.0"
@@ -40,6 +41,12 @@ identity:
   language:
     type: string
     description: "Working language of the organization, as a BCP-47 tag (e.g. 'pt-BR'). Absent means English. Agents operate, write and reply in it; schema field names, record types and code stay in English. Stamped by clone-framework from the config's org.language."
+    required: false
+
+  did:
+    type: string
+    pattern: "^(did:plc:[a-z2-7]{24}|did:web:[A-Za-z0-9-]+(\\.[A-Za-z0-9-]+)*(%3A[0-9]{1,5})?(:[A-Za-z0-9._~%-]+)*)$"
+    description: "The organisation's atproto DID (did:plc or did:web). Published in .well-known/federation.json; the account its public link records are written from"
     required: false
 
   chain:
@@ -91,13 +98,57 @@ identity:
 # ── Network Membership (NEW in v3.0) ─────────────────────────────────────────
 network:
   type: string
-  description: "Federation network identifier (e.g., 'regen-coordination')"
+  description: "Federation network identifier (e.g., 'regen-coordination'). Read as one item of networks."
   required: false
 
 hub:
   type: string
-  description: "Hub repository path (e.g., 'github.com/regen-coordination/hub')"
+  description: "Hub repository URL (e.g., 'https://github.com/regen-coordination/hub'). Read as one item of networks. Published only as a public https address."
   required: false
+
+networks:
+  type: array
+  description: "The networks this instance is in. Each network has one hub node; an instance can be in several networks. When set, network and hub are ignored."
+  items:
+    type: object
+    properties:
+      name:
+        type: string
+        description: "Network name (e.g., 'regen-coordination')"
+      hub:
+        type: string
+        description: "Hub repository URL. Published only as a public https address (github.com/<owner>/<repo> without a scheme counts as one)"
+      url:
+        type: string
+        description: "Read as hub when hub is not set"
+      role:
+        type: string
+        description: "What this instance is in the network (e.g., 'node', 'hub')"
+
+join:
+  type: object
+  description: "How others can join this instance's network. Published in .well-known/federation.json."
+  properties:
+    policy:
+      type: string
+      enum: ["closed", "invite", "open-with-approval", "open"]
+      description: "Who may join"
+    types:
+      type: array
+      description: "Instance types that may join"
+      items:
+        type: string
+    asks:
+      type: array
+      description: "What a newcomer is asked to say or show when joining"
+      items:
+        type: string
+    where:
+      type: string
+      description: "Where to ask, as a public https address (an issue tracker, a form). Anything else is not published"
+    decision:
+      type: string
+      description: "Where the network's standing decision to accept requests under policy open was recorded (a decision id). Without it, open is read as open-with-approval"
 
 peers:
   type: array
@@ -115,11 +166,40 @@ peers:
         type: string
         format: uri
         description: "Full repository URL"
+      type:
+        type: string
+        description: "The peer's instance type (e.g., 'LocalNode', 'Hub')"
+      relationship:
+        type: string
+        description: "Free-form: what the peer is to this instance (e.g., 'network-seat', 'hub', 'node'). Never mapped to a link relation"
+      requested:
+        type: string
+        description: "The id of the federation request this instance sent to this peer, while no decision has come back"
+      did:
+        type: string
+        pattern: "^(did:plc:[a-z2-7]{24}|did:web:[A-Za-z0-9-]+(\\.[A-Za-z0-9-]+)*(%3A[0-9]{1,5})?(:[A-Za-z0-9._~%-]+)*)$"
+        description: "The peer's atproto DID (did:plc or did:web)"
+      link:
+        type: string
+        enum: ["memberOf", "hasMember", "peerOf", "none"]
+        description: "The public link record to publish for this peer, when it should not be derived from the network. none keeps the peer off atproto"
       trust:
         type: string
-        enum: ["full", "read", "none"]
+        enum: ["full", "read", "read-write", "none"]
         description: "Trust level for this peer"
         default: "read"
+      since:
+        type: string
+        format: date
+        description: "When the link started"
+      decision:
+        type: string
+        description: "Where the choice to link was recorded (a decision id or a date)"
+      visibility:
+        type: string
+        enum: ["public", "private"]
+        description: "private keeps this peer out of .well-known/federation.json"
+        default: "public"
 
 # ── Upstream/Downstream Relationships ────────────────────────────────────────
 upstream:
@@ -458,7 +538,7 @@ example: |
       chain: "eip155:100"
 
   network: "regen-coordination"
-  hub: "github.com/regen-coordination/hub"
+  hub: "https://github.com/regen-coordination/hub"
 
   peers:
     - name: "NYC Node"

@@ -44,6 +44,10 @@ export const GOVERNED_FILES: readonly GovernedFile[] = [
     how: 'Its own routes, by design: propose, approve, ratify and the rest write it, never an edit.' },
   { target: 'library', kind: 'registry', path: 'own-routes', what: 'data/library.yaml, the library’s receipts',
     how: 'Its own routes, by design: the library’s Add and Remove.' },
+  { target: 'federation-requests', kind: 'registry', path: 'own-routes', what: 'data/federation-requests.yaml, the requests a hub received',
+    how: 'Its own routes, by design: a request’s arrival and decision write it, never an edit.' },
+  { target: 'invites', kind: 'registry', path: 'own-routes', what: 'data/invites.yaml, the hub’s invites',
+    how: 'Its own routes, by design: it holds hashes and `used_by`, so only the invite routes write it, never an edit.' },
   { target: 'data/kb/**', kind: 'path', path: 'own-routes', what: 'data/kb/, the knowledge commons’ canon',
     how: 'Its own routes: the commons’ entry page prepares an edit and applies it in one commit, under the org’s rules.' },
   { target: 'pages/**', kind: 'path', path: 'page', what: 'pages/, the workspace’s pages',
@@ -68,6 +72,8 @@ export const GOVERNED_FILES: readonly GovernedFile[] = [
     how: `${SOURCE_HOW} The agents’ own tools commit it too. A viewer signed in to the Hub reads it only when they decide under its workspace rule (0.7.1).` })),
   { target: 'IDENTITY.md', kind: 'path', path: 'source', what: 'IDENTITY.md', how: SOURCE_HOW },
   { target: 'federation.yaml', kind: 'path', path: 'source', what: 'federation.yaml', how: SOURCE_HOW },
+  { target: 'federation/**', kind: 'path', path: 'source', what: 'federation/, the requests a node sends',
+    how: SOURCE_HOW },
 ]
 
 const matches = (pattern: string, path: string) =>

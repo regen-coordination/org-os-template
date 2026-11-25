@@ -32,12 +32,12 @@ describe('what each governed file is edited with (F-L3-3)', () => {
     const by = (path: string) => GOVERNED_FILES.filter(f => f.path === path).map(f => f.target)
     expect(by('record')).toEqual(['members', 'projects', 'meetings', 'ideas', 'funding-opportunities', 'relationships', 'sources', 'events', 'channels', 'assets', 'knowledge-gaps', 'systems', 'tasks', 'data/collections/**'])
     expect(by('board')).toEqual(['boards'])
-    expect(by('own-routes')).toEqual(['proposals', 'library', 'data/kb/**'])
+    expect(by('own-routes')).toEqual(['proposals', 'library', 'federation-requests', 'invites', 'data/kb/**'])
     expect(by('page')).toEqual(['pages/**'])
     expect(by('generated')).toEqual(['.well-known/**'])
     // DAO-OS L6 Task 19: the source editor is built; what had no path yet is edited whole there
     expect(by('source')).toEqual(['finances', 'governance', 'knowledge-manifest', 'visibility', 'data/*.yaml', 'collections', 'data/imports.yaml',
-      'memory/**', 'MEMORY.md', 'HEARTBEAT.md', 'docs/plans/**', 'docs/agent-plans/**', 'IDENTITY.md', 'federation.yaml'])
+      'memory/**', 'MEMORY.md', 'HEARTBEAT.md', 'docs/plans/**', 'docs/agent-plans/**', 'IDENTITY.md', 'federation.yaml', 'federation/**'])
     expect(by('none-yet')).toEqual([])
     expect(rowOf('governance')!.how).toMatch(/^The source editor \(\/files\/<path>\).*The governance check \(§7\.6\) runs on it/)
     expect(rowOf('visibility')!.how).toMatch(/Narrowing a record has its own route \(L5\); a text that widens what is public is a publication/)

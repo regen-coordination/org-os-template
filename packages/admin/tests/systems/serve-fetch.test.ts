@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { networkFetch } from '../../server/serve.ts'
+import { networkFetch } from '../../server/net.ts'
 
 describe('the server\'s default fetch', () => {
   it('refuses to reach the network under a test run (S13)', async () => {

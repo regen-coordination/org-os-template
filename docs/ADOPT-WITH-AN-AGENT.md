@@ -1,5 +1,8 @@
 # Adopt org-os with an AI agent
 
+> **Note:** `npm run open` now creates and adopts an instance in the platform, with no agent needed: see
+> [OPENING.md](OPENING.md). This page stays for setting one up with an agent.
+
 The normal way to spin up an org-os instance is to have an AI coding agent —
 Claude Code, Cursor, OpenCode, or a ChatGPT connector with shell access — run
 the setup for you while you answer its questions in plain language. This page

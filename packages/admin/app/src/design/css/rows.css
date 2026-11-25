@@ -138,6 +138,7 @@
 .sysrow-id { font: var(--fw-regular) var(--fs-code)/var(--lh-row) var(--mono); font-variant-numeric: tabular-nums slashed-zero; color: var(--faint);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sysrow-k { display: none; }
+.sysrow-mount { color: var(--faint); font-family: var(--mono); }
 /* A list's column head (the Systems list's Name · Chain · Where · State · Read): the row's grid, 11 faint, a hairline
    under it; under 760px of the list, where the row folds, it goes */
 .dlist-head > .drow.dlist-h { min-block-size: 0; padding-block: var(--sp-5); border-block-start: 0; border-block-end: var(--rule-w) solid var(--rule);

@@ -3,7 +3,7 @@
   "type": "object",
   "required": ["id", "title", "author", "classes", "rules", "state", "opened", "rev", "ops", "events"],
   "additionalProperties": false,
-  "x-order": ["id", "title", "rationale", "author", "classes", "rules", "state", "opened", "opened_as", "suggested", "rev", "base", "branch", "ops", "touched", "statement", "events", "closed"],
+  "x-order": ["id", "title", "rationale", "author", "classes", "rules", "state", "opened", "opened_as", "suggested", "origin", "rev", "base", "branch", "ops", "touched", "statement", "events", "closed"],
   "properties": {
     "id": { "type": "string", "pattern": "^p-\\d{4}-\\d{2}-\\d{2}-\\d{3}(-[0-9a-f]{4})?$", "description": "p-<date>-<NNN>-<xxxx>; NNN counts that day's proposals, xxxx is 4 lowercase hex drawn at random so two clones proposing on one day do not collide. The shape before the suffix, p-<date>-<NNN>, is still accepted." },
     "title": { "type": "string", "minLength": 1 },
@@ -20,6 +20,17 @@
     "opened": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T", "description": "ISO 8601 timestamp, with an offset." },
     "opened_as": { "$ref": "#/$defs/hatAct", "description": "The Hats reading the proposal was opened on, for an author under a role sourced from a hat or at an address (DAO-OS L5 spec §7.2)." },
     "suggested": { "const": true, "description": "Made by Suggest (DAO-OS L6 R-L6-SUGGEST-2): a proposal its author chose instead of saving the page; where the page's rule is workspace/direct it is decided under the built-in rule workspace/suggest." },
+    "origin": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "request", "from"],
+      "properties": {
+        "kind": { "const": "federation-request" },
+        "request": { "type": "string", "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$" },
+        "from": { "type": "string", "minLength": 1 }
+      },
+      "description": "Where a change from outside the org came from (network N2, R13): the join request a hub received, by its id and the asking instance's name. Set by the server from the validated request."
+    },
     "rev": { "type": "string", "minLength": 1, "description": "First 12 hex of sha256 over the ops without bases (ruling P2-R7)." },
     "base": { "type": ["string", "null"], "description": "The trunk sha the branch was last replayed onto." },
     "branch": { "type": ["string", "null"], "pattern": "^proposal/p-\\d{4}-\\d{2}-\\d{2}-\\d{3}(-[0-9a-f]{4})?$" },

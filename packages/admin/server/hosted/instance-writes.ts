@@ -97,6 +97,18 @@ export const INSTANCE_WRITES: readonly InstanceWrite[] = [
   instance('POST', '/api/operations/:op/plan'),
   instance('POST', '/api/jobs'),
   instance('DELETE', '/api/jobs/:id'),
+  // The network (federation/routes.ts): each commits or stages federation.yaml, a request file, the requests ledger or
+  // an invite. Clearing a forgotten request writes only the state folder, but it is refused with the rest (conservative).
+  // Hosted, L9 answers these first (NETWORK_HOSTED).
+  instance('POST', '/api/federation/ask'),
+  instance('POST', '/api/federation/outgoing/:id/withdraw'),
+  instance('POST', '/api/federation/outgoing/:id/clear'),
+  instance('POST', '/api/federation/outgoing/:id/record'),
+  instance('POST', '/api/federation/join'),
+  instance('POST', '/api/federation/migration'),
+  instance('POST', '/api/federation/requests/receive'),
+  instance('POST', '/api/federation/requests/:id/decide'),
+  instance('POST', '/api/federation/invites'),
   // DAO-OS L6, the workspace (plan D-6): everything that writes records, pages, collections, meetings, knowledge, memory,
   // the deploy's read-back or an editing session is refused while off, even where the target is the private store.
   instance('POST', '/api/collections'),

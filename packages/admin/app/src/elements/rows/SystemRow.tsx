@@ -29,6 +29,20 @@ function RowAge({ read, now }: { read: DriverRead | null; now: Date }) {
   )
 }
 
+/** The one line a mounted repo System adds: its clone's branch, how far it is from upstream, uncommitted work; or that it is not cloned. */
+export function mountLine(facts: Record<string, unknown>): string | null {
+  const m = facts.mount
+  if (typeof m !== 'object' || m === null) return null
+  const f = m as { cloned?: unknown; error?: unknown; branch?: unknown; ahead?: unknown; behind?: unknown; dirty?: unknown }
+  if (f.cloned !== true) return 'Not cloned yet.'
+  if (f.error === true) return "Couldn't read this clone."
+  const parts = [typeof f.branch === 'string' ? `On ${f.branch}` : 'On a detached head']
+  if (typeof f.ahead === 'number' && f.ahead > 0) parts.push(`${f.ahead} ahead`)
+  if (typeof f.behind === 'number' && f.behind > 0) parts.push(`${f.behind} behind`)
+  if (f.dirty === true) parts.push('uncommitted work')
+  return parts.join(' · ')
+}
+
 /** A System in a list (§9.2): kind tile · name and kind · chain chip · address (a chip, the Mono id `42220 / 13`,
  *  or the host `snapshot.box`) · one state mark ("1 to sign", "Couldn’t read", "Return proposed" …) · the read
  *  age, end-aligned. Under 760px of its list the chain moves into the second line and the address and the age
@@ -44,11 +58,12 @@ export function SystemRow({ resource, now, proposed, selected = false, href, onP
   const address = f.address === null ? null
     : 'chip' in f.address ? <AddressChip value={f.address.chip} chain={f.chains.length === 1 ? f.chains[0] : undefined} still />
     : <span className="mono sysrow-id">{'mono' in f.address ? f.address.mono : f.address.host}</span>
+  const mount = mountLine(resource.facts)
   const age = f.kind === 'link' ? <span className="age" aria-hidden="true">—</span> : <RowAge read={f.read} now={now} />
   return (
     <DataRow kind={f.kind} title={resource.name} item={resource} selected={selected} marks={[]} tone={state.mark === 'needs' ? 'attn' : 'plain'}
       href={href} onPreview={onPreview}
-      className="sysrow" second={<>{kindWord(f.kind)}<span className="sysrow-k">{chain}</span></>}
+      className="sysrow" second={<>{kindWord(f.kind)}<span className="sysrow-k">{chain}</span>{mount === null ? null : <span className="sysrow-mount"> · {mount}</span>}</>}
       trailing={<>
         <span className="sysrow-chain">{chain}</span>
         <span className="sysrow-addr">{address}</span>

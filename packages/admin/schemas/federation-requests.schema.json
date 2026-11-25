@@ -1,0 +1,32 @@
+{
+  "$id": "orgos://registry/federation-requests",
+  "type": "object",
+  "required": ["id", "received", "transport", "from", "network", "answers", "invite", "outcome"],
+  "additionalProperties": false,
+  "x-order": ["id", "received", "transport", "ref", "from", "network", "answers", "invite", "outcome", "reason", "proposal", "decision"],
+  "properties": {
+    "id": { "title": "Id", "description": "The request's own id, a UUID.", "type": "string", "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$" },
+    "received": { "title": "Received", "description": "When the hub received it, ISO 8601.", "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T" },
+    "transport": { "title": "Transport", "description": "How it arrived.", "enum": ["file", "github"] },
+    "ref": { "title": "Reference", "description": "Where it came from: a file name or an issue address.", "type": ["string", "null"] },
+    "from": {
+      "title": "From",
+      "description": "The asking instance: name, type and public https address. No person.",
+      "type": "object",
+      "required": ["name", "type", "url"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "type": { "type": "string", "minLength": 1 },
+        "url": { "type": "string", "pattern": "^https://" }
+      }
+    },
+    "network": { "title": "Network", "description": "The network asked to join.", "type": "string", "minLength": 1 },
+    "answers": { "title": "Answers", "description": "The answers to the hub's asks, by ask.", "type": "object", "additionalProperties": { "type": "string" } },
+    "invite": { "title": "Invite", "description": "The id of the invite that matched. Never the token.", "type": ["string", "null"], "pattern": "^i-[0-9a-f]{8}$" },
+    "outcome": { "title": "Outcome", "description": "What the hub did with it.", "enum": ["refused", "accepted", "proposed", "held"] },
+    "reason": { "title": "Reason", "description": "Why it was refused.", "type": "string" },
+    "proposal": { "title": "Proposal", "description": "The proposal opened for it, when outcome is proposed.", "type": "string" },
+    "decision": { "title": "Decision", "description": "Where the acceptance was recorded.", "type": "string" }
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "$id": "orgos://registry/invites",
+  "type": "object",
+  "required": ["id", "name", "type", "network", "expires", "token_sha256", "used_by"],
+  "additionalProperties": false,
+  "x-order": ["id", "name", "type", "network", "expires", "token_sha256", "used_by"],
+  "properties": {
+    "id": { "title": "Id", "description": "The invite's id, i- and 8 hex digits.", "type": "string", "pattern": "^i-[0-9a-f]{8}$" },
+    "name": { "title": "For", "description": "Who the invite is for.", "type": "string", "minLength": 1 },
+    "type": { "title": "Type", "description": "The instance type it admits.", "type": "string", "minLength": 1 },
+    "network": { "title": "Network", "description": "The network it admits to.", "type": "string", "minLength": 1 },
+    "expires": { "title": "Expires", "description": "The last day it works, or an ISO 8601 time.", "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}" },
+    "token_sha256": { "title": "Token hash", "description": "The SHA-256 of the token, in hex. The token itself is never kept.", "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "used_by": { "title": "Used by", "description": "The id of the request that used it, or empty while it is unused.", "type": ["string", "null"] }
+  }
+}

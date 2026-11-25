@@ -11,6 +11,20 @@ export const quoteArg = (arg: string): string => (/^[\w@%+=:,./-]+$/.test(arg) ?
 export const commandLine = (plan: PlanReply): string =>
   plan.inProcess ? 'inside the server (reads only)' : [plan.cmd ?? '', ...plan.args].map(quoteArg).join(' ')
 
+/** What an in-process operation that changes something does outside the repository, in one plain line (R16: the
+ *  operator confirms what will actually happen, never "reads only"). Null for an operation that only reads. */
+export function outsideSentence(op: Pick<OperationInfo, 'id' | 'effect' | 'network'>, params: Record<string, unknown> = {}): string | null {
+  if (op.effect !== 'changes') return null
+  if (op.id === 'federation.publish-links') return 'This writes to atproto.'
+  if (op.id === 'federation.send') {
+    return params.transport === 'github' ? 'This posts to GitHub.'
+      : params.transport === 'file' ? 'This saves the request as a file for you to send.'
+      : 'This sends your request to the hub over the network.'
+  }
+  if (op.id === 'federation.reply') return 'This answers them where their request came from.'
+  return op.network ? 'This reaches the network and changes things outside this repository.' : 'This changes things outside this repository.'
+}
+
 /** The confirm dialog for an operation (§14.2 `record/ConfirmBox`, E-66): a modal `ConfirmDialog` named for what
  *  runs. Its body: what the operation does (reads or changes, and the network), the parameters to fill in as field
  *  rows of the house's inputs, then the exact command in a Mono well, what it may write and its time limit. Its one
@@ -50,6 +64,7 @@ export default function ConfirmBox({ op, resource, onDone, onCancel }:
   const required = new Set(op.params.required ?? [])
   const errorOf = (key: string) => errors.filter(x => x.field === key).map(x => x.message).join(' ') || undefined
 
+  const outside = plan?.inProcess ? outsideSentence(op, { ...(op.preset ?? {}), ...params }) : null
   const body = (
     <>
       <p className="ops-k">{op.effect}{op.network ? ' · network' : ''}</p>
@@ -74,10 +89,15 @@ export default function ConfirmBox({ op, resource, onDone, onCancel }:
       )}
       {errors.filter(x => !fields.some(([k]) => k === x.field)).map((x, i) => <Refusal key={i}>{x.message}</Refusal>)}
       {error && <Refusal>{error}</Refusal>}
-      {plan && <>
+      {plan && (outside !== null ? <>
+        {/* An in-process change outside the repository: the plan's own sentence and where it writes, never a command line */}
+        <p>{plan.summary ?? 'It runs inside the server.'}</p>
+        <p>{outside}</p>
+        <p className="ops-k">changes no file in this repository · timeout {Math.round(plan.timeoutMs / 1000)} s</p>
+      </> : <>
         <code className="mono-well">{commandLine(plan)}</code>
         <p className="ops-k">{plan.writes.length ? `may write ${plan.writes.join(', ')}` : 'writes nothing'} · timeout {Math.round(plan.timeoutMs / 1000)} s</p>
-      </>}
+      </>)}
     </>
   )
   // A refused run clears the plan; with nothing to fill in, planning again is the only way back to Run.

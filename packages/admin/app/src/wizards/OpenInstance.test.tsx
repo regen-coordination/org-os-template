@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { describe, it, expect, vi } from 'vitest'
-import { fireEvent, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import OpenInstance from './OpenInstance.tsx'
 import { ViewAsProvider } from '../viewAs/ViewAs.tsx'
 import { fetchRoutes } from '../test/fetchRoutes.ts'
@@ -164,5 +165,112 @@ describe('W1, first screens: open an organization', () => {
     await screen.findByLabelText('Your name'); type('Your name', 'Steward A'); click('Continue')
     const stop = await screen.findByText(/does not create the folder/i)
     expect(within(stop.closest('.wiz-body')!).getByText(/how it decides|starting set/i)).toBeTruthy()
+  })
+})
+
+describe('W1 with a run: the launcher creates it', () => {
+  async function toReview(run: (a: unknown) => Promise<{ error: string } | void>) {
+    renderAt(<OpenInstance def={def} run={run as never} base="/w" />)
+    await screen.findByRole('heading', { level: 2, name: 'About the organization' }) // the start step is skipped
+    fillOrg()
+    type('Name', 'Alder Commons')
+    expect((screen.getByLabelText('Folder to create') as HTMLInputElement).value).toBe('/w/alder-commons')
+    click('Continue')
+    await screen.findByLabelText('Your name')
+    type('Your name', 'Steward A'); type('Git email', 'a@alder.example'); click('Continue')
+    await screen.findByRole('button', { name: 'Create it' })
+  }
+
+  it('shows Create it, calls run with the answers, and writes no draft', async () => {
+    const { calls } = fetchRoutes(routes())
+    const run = vi.fn(async (_a: unknown) => {})
+    await toReview(run)
+    expect(screen.queryByRole('button', { name: 'Copy the command' })).toBeNull()
+    click('Create it')
+    await waitFor(() => expect(run).toHaveBeenCalledTimes(1))
+    expect(run.mock.calls[0]![0]).toMatchObject({ name: 'Alder Commons', type: 'LocalNode', folder: '/w/alder-commons', operatorName: 'Steward A', email: 'a@alder.example' })
+    expect(calls.filter(c => c.path.includes('/draft') || c.path === '/api/actor')).toEqual([])
+  })
+
+  it('the review says what Create it does, not that the app does not run anything', async () => {
+    fetchRoutes(routes())
+    await toReview(vi.fn(async () => {}))
+    expect(screen.getByRole('heading', { level: 2, name: 'Check the answers' })).toBeTruthy()
+    expect(screen.getByText('Create it makes the folder and its first commit.')).toBeTruthy()
+    expect(screen.queryByText(/does not run it/)).toBeNull()
+    expect(screen.queryByText(/The command, and the file it reads/)).toBeNull()
+  })
+
+  it('the adopt review says nothing is written yet', async () => {
+    fetchRoutes(routes())
+    renderAt(<OpenInstance def={def} run={(async () => {}) as never} base="/w" fixedFolder="/home/me/plain" />)
+    await screen.findByRole('heading', { level: 2, name: 'About the organization' })
+    fillOrg(); click('Continue')
+    await screen.findByLabelText('Your name')
+    type('Your name', 'Steward A'); type('Git email', 'a@alder.example'); click('Continue')
+    await screen.findByRole('button', { name: 'See what it adds' })
+    expect(screen.getByRole('heading', { level: 2, name: 'Check the answers' })).toBeTruthy()
+    expect(screen.getByText('Nothing is written to your repo yet. Next you see every file it would add.')).toBeTruthy()
+    expect(screen.queryByText(/does not run it/)).toBeNull()
+  })
+
+  it('shows what run returns as an error', async () => {
+    fetchRoutes(routes())
+    await toReview(vi.fn(async () => ({ error: 'That folder already holds files.' })))
+    click('Create it')
+    expect(await screen.findByText('That folder already holds files.')).toBeTruthy()
+  })
+
+  it('without run, still shows Copy the command', async () => {
+    fetchRoutes(routes())
+    renderAt(<OpenInstance def={def} />)
+    await toOrg(); fillOrg(); click('Continue')
+    await screen.findByLabelText('Your name'); type('Your name', 'Steward A'); click('Continue')
+    expect(await screen.findByRole('button', { name: 'Copy the command' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Create it' })).toBeNull()
+    expect(screen.getByText(/This app does not run it/)).toBeTruthy()
+    expect(screen.getByRole('heading', { level: 2, name: 'The command, and the file it reads' })).toBeTruthy()
+  })
+
+  it('opens at the questions with no intro, and Close calls onClose', async () => {
+    fetchRoutes(routes())
+    const onClose = vi.fn()
+    renderAt(<OpenInstance def={def} run={(async () => {}) as never} onClose={onClose} />)
+    expect(await screen.findByRole('heading', { level: 2, name: 'About the organization' })).toBeTruthy()
+    expect(screen.queryByText(/kept as a draft/)).toBeNull()
+    click('Close')
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('in StrictMode (the double effect of dev) opens at the questions with no stray refusal', async () => {
+    fetchRoutes(routes())
+    // StrictMode at the root (renderAt's providers sit above it, where React does not double the effects)
+    render(<QueryClientProvider client={new QueryClient()}><OpenInstance def={def} run={(async () => {}) as never} /></QueryClientProvider>, { reactStrictMode: true })
+    expect(await screen.findByRole('heading', { level: 2, name: 'About the organization' })).toBeTruthy()
+    expect(document.querySelector('.note-error')).toBeNull()
+  })
+
+  it('with fixedFolder, the folder is preset and its field hidden', async () => {
+    fetchRoutes(routes())
+    const run = vi.fn(async (_a: unknown) => {})
+    renderAt(<OpenInstance def={def} run={run as never} base="/w" fixedFolder="/home/me/plain" />)
+    await screen.findByRole('heading', { level: 2, name: 'About the organization' })
+    expect(screen.queryByLabelText('Folder to create')).toBeNull()
+    fillOrg()
+    click('Continue')
+    await screen.findByLabelText('Your name')
+    type('Your name', 'Steward A'); type('Git email', 'a@alder.example'); click('Continue')
+    const next = await screen.findByRole('button', { name: 'See what it adds' })
+    expect(screen.queryByRole('button', { name: 'Create it' })).toBeNull()
+    fireEvent.click(next)
+    await waitFor(() => expect(run).toHaveBeenCalledTimes(1))
+    expect(run.mock.calls[0]![0]).toMatchObject({ name: 'Alder Commons', folder: '/home/me/plain' })
+  })
+
+  it('without run, opens at the intro as before', async () => {
+    fetchRoutes(routes())
+    renderAt(<OpenInstance def={def} />)
+    expect(await screen.findByRole('heading', { level: 2, name: 'Open an organization' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Start' })).toBeTruthy()
   })
 })

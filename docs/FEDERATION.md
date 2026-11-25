@@ -57,6 +57,7 @@ identity:
 | `gardens` | string | no | Gardens DAO contract address or status |
 | `onchain_registration` | object | no | On-chain org registration (chain, contract address, enabled flag) |
 | `scope` | string | no | Optional qualifier for what this node is within its type (e.g., `operational-unit`, `bioregion`, `program`) |
+| `did` | string | no | The org's atproto DID: `did:plc:` and 24 base32 characters, or `did:web:` and a host. The account its link records are written from (see [Link records on atproto](#link-records-on-atproto)). Anything else is ignored, with a warning |
 
 The `type` field determines how other nodes interpret this instance. A `Hub` aggregates peers. A `LocalNode` operates within a geographic scope. A `PersonalNode` is a single person's own instance: their practice, portfolio, or garden, federating as a peer rather than representing a collective. A `DAO` or `Cooperative` has governance on-chain. A `Project` is a focused initiative. A `Foundation` is a supporting entity.
 
@@ -68,13 +69,55 @@ Declares this instance's position in the network topology.
 
 ```yaml
 network: "regen-coordination"
-hub: "github.com/regen-coordination/hub"
+hub: "https://github.com/regen-coordination/hub"
 ```
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `network` | string | recommended | Name of the federation network this instance belongs to |
-| `hub` | URL | recommended | URL of the hub repository that aggregates network data |
+| `network` | string | recommended | Name of the federation network this instance belongs to. Read as one item of `networks` |
+| `hub` | URL | recommended | URL of the hub repository that aggregates network data. Read as one item of `networks` |
+
+An instance in more than one network lists them under `networks` instead. When `networks` is set, `network` and `hub` are ignored.
+
+An older file may keep `network`, `hub`, `networks` or `peers` inside a `federation:` block. They are still read from there when the top level has none of them, and `validate:schemas` asks you to move them to the top level.
+
+```yaml
+networks:
+  - name: "regen-coordination"
+    hub: "https://github.com/regen-coordination/hub"
+    role: "node"
+  - name: "refi-dao"
+    hub: "https://github.com/refi-dao/hub"
+    role: "node"
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | string | yes | Name of the network |
+| `hub` | URL | recommended | The network's hub repository. `url` is read the same way when there is no `hub` |
+| `role` | string | no | What this instance is in that network, for example `node` or `hub` |
+
+### join
+
+Says how others can join this instance's network. It is published in `.well-known/federation.json`.
+
+```yaml
+join:
+  policy: "open-with-approval"
+  types: ["LocalNode", "PersonalNode"]
+  asks: ["who you are", "why you want to join"]
+  where: "https://github.com/org/hub/issues"
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `policy` | enum | yes | One of: `closed`, `invite`, `open-with-approval`, `open` |
+| `types` | list | no | Instance types that may join |
+| `asks` | list | no | What a newcomer is asked to say or show |
+| `where` | string | no | Where to ask, as a public `https://` address (an issue tracker, a form). Anything else is not published |
+| `decision` | string | no | Under `open`: the standing decision that accepts a request on arrival (a decision id from your Decided list). Without one, `open` works as `open-with-approval` |
+
+A `join` with an unknown `policy` is ignored, and `validate:schemas` says so.
 
 ---
 
@@ -93,15 +136,36 @@ peers:
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `name` | string | yes | Human-readable peer name |
-| `repo` | string | yes | Path or slug to the peer repository (relative to workspace or GitHub) |
+| `repo` | string | yes | Where the peer lives: a path relative to this instance or to a folder above it (such as `03 Libraries/…` in a vault), a GitHub `owner/repo`, or a URL |
 | `url` | URL | yes | Public URL of the peer |
-| `trust` | enum | yes | One of: `full`, `read`, `none` |
+| `trust` | enum | yes | One of: `full`, `read`, `read-write`, `none` |
+| `since` | date | no | When the link started |
+| `decision` | string | no | Where the choice to link was recorded (a decision id or a date) |
+| `visibility` | enum | no | `public` (default) or `private`. A `private` peer is never published |
+| `relationship` | string | no | Free-form: what the peer is to this instance (`hub`, `node`, `network-seat`…). Only `node`, on a hub, can make a peer a member (`hasMember`); no other word is mapped to a link |
+| `did` | string | no | The peer's atproto DID (`did:plc:` and 24 base32 characters, or `did:web:` and a host), the `subject` of the record published for it. Set through the migration list, or by **Ask** for the hub when a lookup tied it (see [The migration list](#the-migration-list)). Anything else is ignored, with a warning |
+| `link` | enum | no | The relation the record for this peer states: `memberOf`, `hasMember` or `peerOf`; or `none`, to keep the peer off atproto. Without it the relation is worked out (the hub of one of your `networks` is `memberOf`; on a hub, a `node` with a `decision`, or one mutual by files that names you as its hub, is `hasMember`) |
+| `requested` | string | no | The id of the request you sent this peer, while no decision has come back. **Record it** replaces it with `decision` |
 
 **Trust levels:**
 
 - `full` — Bidirectional sync. This node can push knowledge to the peer, and the peer can push back. Used between tightly coupled organizations.
 - `read` — This node can read the peer's published data but does not push to it. The default for most federations.
+- `read-write` — This node reads the peer's published data and may also send changes to it, but nothing flows back automatically.
 - `none` — Peer is listed for reference but no automated exchange occurs.
+
+#### Link state
+
+Whether a link is real depends on both sides, so it is worked out each time from both `federation.yaml` files and never stored. In N0 a peer is in one of four states (joining a network adds `requested`, `left` and atproto records: see [Joining a network](#joining-a-network)):
+
+| State | Meaning |
+|-------|---------|
+| `mutual` | You list them and they list you back |
+| `claimed` | You list them, but they do not list you |
+| `not-an-instance` | The folder exists but has no `federation.yaml`: it is a repo, not an org-os instance. Map it as a System in `data/systems.yaml` |
+| `unknown` | Their side can't be read from here: the folder is missing, the file is broken, or the peer is only a URL |
+
+`npm run validate:schemas` turns `claimed`, `not-an-instance` and `unknown` into warnings, except an `unknown` peer known only by a URL or a GitHub `owner/repo`, which there is no folder to check for. It never fails because of them, except under `--strict`. Nothing in a `peers` list is ever moved or removed for you.
 
 ---
 
@@ -449,6 +513,159 @@ not an error — `sync-upstream` seeds it on the first sync.
 
 ---
 
+## Joining a network
+
+A node asks to join a hub's network. The hub decides under its own rules. Then each side publishes one public
+record, and the link is mutual once both have. Everything here happens on the Federation page of the admin
+(`/federation`), and every step that reaches the network asks you to confirm it first.
+
+### Hosting a network: the join policy
+
+The hub says how others join in its `join` block (above). The Federation page's Join policy form writes it, as
+an `identity` change under your rules: committed if your rule lets you decide alone, staged otherwise.
+
+| Policy | What happens to a request |
+|--------|---------------------------|
+| `closed` | Refused. No `join` block means `closed`. |
+| `invite` | Accepted on arrival when it carries a valid invite; refused otherwise. |
+| `open-with-approval` | **Recommended.** Anyone can ask. The hub decides under its own rules. |
+| `open` | Accepted on arrival, under a standing decision you name (`join.decision`). Without one it works as `open-with-approval`. |
+
+`types` limits who may ask, and every entry of `asks` must be answered. A request that fails either is refused.
+
+When a request arrives under `open-with-approval`, it goes one of two ways:
+
+- If your rule for `identity` lets you decide alone, it is **held** for you. Accept it, or refuse it with a reason.
+- Otherwise it becomes a proposal under **From outside**, and it is accepted when the proposal is ratified.
+
+Either way, accepting adds one `peers` entry for the node, with `relationship: node` and a `decision`. The hub
+builds that entry from the request's checked fields only. It never applies anything else a request carries, and it
+never writes the node's `did`: set it afterwards through the [migration list](#the-migration-list), before
+publishing `hasMember`. A request addressed to another hub is refused.
+
+Every request the hub receives is recorded in its git, in `data/federation-requests.yaml`: who asks (`name`, `type`,
+`url`), the network, the answers to your asks, and, when you refuse one, your reason. If the hub's repository is
+public, so is that record.
+
+### Asking to join
+
+1. Look the hub up by its address. This reads its `federation.json`.
+2. Answer its asks and choose **Ask**. This writes your own change: the network and the hub's peer entry in
+   `federation.yaml`, with `requested`, and the request itself in `federation/outgoing/<id>.yaml`. It is committed
+   when your rule lets you change `identity` alone, and staged otherwise. Nothing is sent. The hub's `did` goes into
+   its peer entry only when **Check links** has tied it to the hub (see [The migration list](#the-migration-list));
+   otherwise the migration list suggests it later.
+3. If it was staged, apply it under your rules. Sending waits until the request is on your trunk.
+4. Send it. If it went by GitHub, follow the answer, and **Record it** once the hub accepts. This sets the peer's
+   `decision`.
+
+A request holds org-level facts only: its id, when it was made, who asks (`name`, `type`, `url`), the hub, the
+network and the answers. It has no field for a person's contact. It is committed to git on both sides (yours in
+`federation/outgoing/`, the hub's in `data/federation-requests.yaml`), so it is public wherever the repository is.
+
+### How a request travels
+
+| Way | What it needs | The answer |
+|-----|---------------|------------|
+| File | Nothing. You get a file, and pass it on by any channel. The hub imports it. | Told by the same channel. |
+| GitHub | The hub's `where` is a GitHub repo, and `gh` is installed and signed in on your machine. The request becomes an issue there. | The hub replies by closing the issue; **Check the answer** reads it. |
+
+Hosted, peer-to-peer and atproto requests are listed but not built yet. A request is never published on atproto.
+
+A request sent as a file, invited or not, has no Record step. Once the hub lists you, the link is mutual by
+files, and your `memberOf` is published without a recorded decision. Run **Check links**, then **Publish links**.
+
+### Invites
+
+The hub makes an invite for one org, one type and one network. It is valid for 1 to 90 days and can be used once.
+The hub shows its link once (`…/federation.json#invite=<token>`). Send it privately.
+
+- The hub keeps only the token's SHA-256 hash, in `data/invites.yaml`. An invite works once that file is on its trunk.
+- The asking node keeps the token outside git, in its state folder. Its request file in git never holds it.
+- An invited request always goes as a file. GitHub refuses it, so the token never lands in a public issue.
+
+### Link records on atproto
+
+Each side publishes one record in its own atproto repository:
+
+- **`<authority>.link`** holds `subject` (the other side's DID), `relation` (`memberOf`, `hasMember` or `peerOf`),
+  `network` (optional) and `createdAt`.
+- **`<authority>.profile`** (key `self`) holds `networks: [{ hub, name }]`, the hub's DID and the network's name,
+  beside the profile's `name` and `createdAt`.
+
+The pairs are `memberOf` ↔ `hasMember` and `peerOf` ↔ `peerOf`. A link is mutual on atproto when both sides have
+published their record. The link state can say `mutual` before that: it means both sides' statements agree (your
+`federation.yaml`, and their record). If your own record isn't published yet, a drift line says so: `Not published
+yet.` The hub publishes `hasMember` after it accepts and has set the node's `did`. The node publishes `memberOf`
+after it has recorded the acceptance, or, for a request sent as a file (which has no Record step), once the hub lists
+it and the link is mutual by files.
+
+**Never published:** private peers (`visibility: private`), peers without a public `https` url, requests, answers,
+invites, decision references, notes and contacts. Kept-back peers are counted, never named. If a peer becomes
+private, its old record is withdrawn.
+
+**Which account writes them:** the org's own, through kms. `kms.yaml` names it under `atproto` (`did`, `handle`,
+`pds`), and that `did` must equal `identity.did` in `federation.yaml`. The app password is read from the server's
+environment, `ATPROTO_APP_PASSWORD`. It is never stored, shown or logged.
+
+**Publishing:** run **Check links** first, then **Publish links**. The plan is built from `federation.yaml` on your
+trunk and shows how many links it publishes and withdraws. It writes the network and a receipt outside the
+repository; it never changes a file. A run that would leave you no link record refuses to withdraw two or more at once.
+
+**Precedence.** Your side of a link is `federation.yaml`, decided under your rules; your record is published from
+it and never read back into it. Once the other side has a profile record, their records decide their side, and
+their files are only a cross-check. Without a profile record, their files decide. A read that fails never moves a
+link: the last reading stays, with its date.
+
+**The authority** is the network's lexicon domain. Until the network sets one, it is the placeholder
+`example.orgosnetwork`. Nothing under an `example.` authority is written to a live account: publishing refuses it.
+
+### The migration list
+
+The Federation page lists each public peer with the DID and the relation a record for it would carry, from your
+trunk's `federation.yaml` and what the last **Check links** read. Setting a peer's `did` or `link` there is one
+`federation.yaml` edit, an `identity` change under your rules. It publishes nothing by itself; **Publish links** does,
+later.
+
+It is how DIDs get into `federation.yaml`. It writes a DID only when a confirmed **Check links** tied it to that peer:
+a `did:web` for the peer's own host; a handle that is the peer's host and names the DID back; or the peer's
+`federation.json` naming the DID while the DID's own profile names the peer's url. A peer's word alone ties nothing.
+A hub's acceptance never writes the member's DID (a request carries none), so a hub sets it here after accepting.
+**Ask** writes the hub's DID only under the same test.
+
+### What each link state means
+
+| State | Meaning |
+|-------|---------|
+| `mutual` | You list them, and they list you back: their record, or their files when they have no profile record. |
+| `claimed` | You list them, but they don't list you, and you haven't recorded a decision. |
+| `requested` | You asked, and the hub hasn't answered yet (your peer entry has `requested`). |
+| `left` | You recorded a decision, and they no longer list you: they withdrew their record, or left. |
+| `not-an-instance` | The folder is a repo, not an org-os instance. |
+| `unknown` | Their side can't be read from here, or hasn't been checked yet. |
+
+A record of yours that `federation.yaml` doesn't allow, or a link `federation.yaml` wants but you haven't
+published, is drift. It is shown on the page with its fix, and the fix is always a confirmed publish.
+
+### Leaving
+
+Withdrawing a request after it was accepted is leaving. It is your governed change first: the network entry goes
+from `federation.yaml`. Then publish, so your record is withdrawn. The hub then sees the link as `left`.
+
+### Before the live pilot
+
+The pilot on copies against a mocked PDS passed (`docs/superpowers/plans/2026-11-22-network-n2-atproto-acceptance.md`).
+Running it for real is a separate go, and it needs:
+
+- the hub council's join policy, decided and written in the hub's `join` block;
+- an atproto account for each org, named in its `kms.yaml` under `atproto`, with its app password in that server's
+  environment (`ATPROTO_APP_PASSWORD`);
+- the network's lexicon domain. The placeholder `example.orgosnetwork` is refused on live accounts;
+- `networks` and `peers` at the top level of each `federation.yaml`. An instance that nests them under
+  `federation:` is told to move them to the top level, and asking refuses until they are moved.
+
+---
+
 ## Federation Roles
 
 Instances in a federation network take on different roles based on their `identity.type` and position in the network topology.
@@ -463,7 +680,7 @@ Responsibilities:
 - Publishes a unified `.well-known/` surface covering the entire network
 - Coordinates cross-org initiatives
 
-A federation has exactly one hub. The hub URL is declared in every peer's `federation.yaml` under the `hub` field.
+Each network has one hub node; an instance can be in several networks. The hub URL is declared in every peer's `federation.yaml` under the `hub` field (or in `networks`).
 
 ### Peer / Node
 
@@ -673,6 +890,10 @@ Every org-os instance publishes machine-readable JSON schemas in `.well-known/` 
 3. The `dao.json` links to other schemas. The peer can then fetch `members.json`, `projects.json`, etc.
 4. For federation specifically, a peer reads `knowledge.json` to discover what knowledge domains are available and how many pages exist.
 
+### federation.json
+
+`.well-known/federation.json` publishes this instance's own public claims: its networks, its join terms and the peers it is willing to name. A peer is listed only when its `url` is a public `https:` address and it is not `visibility: private`. Notes, contacts, relationships and local paths are never published, and peers held back are only counted. A network's `hub` and the `join.where` are published the same way: only as a public `https:` address (`github.com/<owner>/<repo>` written without `https://` counts as one). Anything else, such as a local path or a name with no dot like `https://nas/`, is left out, and `validate:schemas` warns about it.
+
 ### Generating schemas
 
 ```bash
@@ -753,7 +974,7 @@ Fill in the `identity` section. At minimum, set `name` and `type`. If you have o
 
 ### 3. Join a network
 
-Set `network` to the federation network name and `hub` to the hub URL. Ask the hub maintainer to add your instance to their `nodes.yaml`.
+Look the hub up on the Federation page, answer its asks and send your request. See [Joining a network](#joining-a-network).
 
 ### 4. Add peers
 
@@ -793,7 +1014,7 @@ identity:
   type: "Project"
 
 network: "regen-coordination"
-hub: "github.com/regen-coordination/hub"
+hub: "https://github.com/regen-coordination/hub"
 
 peers:
   - name: "Hub"

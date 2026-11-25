@@ -3,11 +3,11 @@ import { ago } from './time.ts'
 import { REGISTRY_OF_KIND } from '../../lib/registries.mjs'
 
 /** Left to right on a map: people before what they lead; running parts before what they feed. */
-export const KIND_ORDER = ['person', 'project', 'idea', 'funding', 'partner', 'meeting', 'event', 'organization', 'task', 'knowledge-gaps', 'proposal',
+export const KIND_ORDER = ['person', 'project', 'idea', 'funding', 'partner', 'meeting', 'event', 'organization', 'task', 'knowledge-gaps', 'proposal', 'federation-request',
   'knowledge', 'role', 'seat', 'module', 'instance', 'connector', 'source', 'channel', 'system', 'absent']
 
 const LABEL: Record<string, string> = {
-  'knowledge-gaps': 'knowledge gaps', knowledge: 'knowledge commons', role: 'crew role', seat: 'crew seat', connector: 'KMS connector', absent: 'not here',
+  'knowledge-gaps': 'knowledge gaps', knowledge: 'knowledge commons', 'federation-request': 'join request', role: 'crew role', seat: 'crew seat', connector: 'KMS connector', absent: 'not here',
 }
 export const kindLabel = (kind: string): string => LABEL[kind] ?? kind
 
@@ -55,6 +55,7 @@ export const FACT_COLUMNS: Record<string, FactColumn[]> = {
   person: [fact('role'), fact('layer')],
   funding: [fact('deadline'), fact('fit')],
   partner: [fact('type'), fact('since')],
+  'federation-request': [fact('network'), fact('received')],
   proposal: [fact('author'), { label: 'closes', value: r => factText(r.facts.closesAt).slice(0, 10) }],
   idea: [fact('votes'), fact('updated')],
   meeting: [{ label: 'date', value: r => factText(r.facts.date).slice(0, 10) }, { label: 'recording', value: r => (r.facts.recorded ? 'recorded' : '') }],

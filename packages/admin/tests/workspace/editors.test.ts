@@ -3,7 +3,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { EDITORS, editorFor, editorRowFor } from '../../lib/workspace/editors.mjs'
+import { EDITORS, editorFor, editorRowFor, wholeFileRefusal } from '../../lib/workspace/editors.mjs'
 import { governedClassOf } from '../../lib/change-classes.mjs'
 import { REGISTRIES, registryFileOf } from '../../lib/registries.mjs'
 
@@ -43,6 +43,15 @@ describe('every governed file has an editor (F-L3-3)', () => {
     expect(editorFor('DECISIONS.md')).toBe('ratify')
     expect(editorFor('data/horizon.yaml')).toBe('source')
     expect(editorFor('data/governance.yaml')).toBe('rules+source')
+  })
+  it('the hub’s received requests and invites are never edited whole (they hold hashes and used_by): own routes (Task 10)', () => {
+    for (const p of ['data/federation-requests.yaml', 'data/invites.yaml']) {
+      expect(editorFor(p), p).toBe('own-routes')
+      expect(wholeFileRefusal('own-routes')).toMatch(/federation routes/)
+    }
+    // a node's outgoing request files hold neither, and the node's own routes stage them through the file op
+    expect(editorFor('federation/outgoing/3f2a.yaml')).toBe('source')
+    expect(editorFor('federation.yaml')).toBe('source')
   })
   it('the rest of the spec table, row by row', () => {
     expect(editorFor('data/members.yaml')).toBe('record')

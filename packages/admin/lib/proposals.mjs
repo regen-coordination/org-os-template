@@ -20,7 +20,7 @@ import { actorIdOf, standing } from './hat-readings.mjs'
 /** @typedef {import('./ops.mjs').StageOp} StageOp */
 /** @typedef {import('./hat-readings.mjs').HatObservation} HatObservation */
 /** @typedef {{ id: string, at: string, by: string, kind: string, rev?: string, text?: string, vote?: string, of?: string, answered?: boolean, [key: string]: unknown }} LedgerEvent */
-/** @typedef {{ id: string, title: string, author: string, classes: string[], rules: Rule[], state: string, opened: string, rev: string, ops: (StageOp & { base?: string | null })[], events: LedgerEvent[], closed?: unknown, [key: string]: unknown }} Proposal */
+/** @typedef {{ id: string, title: string, author: string, classes: string[], rules: Rule[], state: string, opened: string, rev: string, ops: (StageOp & { base?: string | null })[], events: LedgerEvent[], closed?: unknown, origin?: { kind: 'federation-request', request: string, from: string }, [key: string]: unknown }} Proposal */
 
 /** The five stored states (architecture §4.4). The open sub-states are derived on read. */
 export const PROPOSAL_STATES = Object.freeze(['open', 'ratified', 'rejected', 'withdrawn', 'expired'])
@@ -327,6 +327,14 @@ export function checkProposals(entries, ctx = {}) {
     } else if (memberIds && typeof entry.author === 'string' && !memberIds.has(entry.author)) bad('author', `author "${entry.author}" is not a member in data/members.yaml`)
     const closedBy = isMap(entry.closed) ? entry.closed : null
     if (closedBy && isAddress(closedBy.by) && !isMap(closedBy.as)) bad('closed', CLOSED_BY_ADDRESS)
+
+    // A change from outside the org (network N2, R13) names the request it was built from, and nothing else.
+    if (entry.origin !== undefined) {
+      const o = entry.origin
+      if (!isMap(o) || o.kind !== 'federation-request' || typeof o.request !== 'string' || typeof o.from !== 'string' || o.from === '') {
+        bad('origin', '`origin` names a join request: { kind: federation-request, request: <its id>, from: <the asking instance> }')
+      }
+    }
 
     // The rules it was opened under, against the rule shape.
     if (!Array.isArray(entry.rules) || entry.rules.length === 0) bad('rules', 'this proposal holds no rules: it records the rules it was opened under')

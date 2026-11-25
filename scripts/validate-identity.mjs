@@ -29,7 +29,8 @@
  * Mirrors scripts/validate-structure.mjs, which has always taken argv[2].
  */
 
-import { readFileSync, existsSync, readdirSync } from "node:fs";
+import { readFileSync, existsSync, readdirSync, statSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import yaml from "js-yaml";
@@ -248,6 +249,87 @@ if (existsSync(fedPath)) {
       String(meta.last_sync_commit).slice(0, 12),
     );
   }
+}
+
+// --- 4. Federation links ---
+console.log("\n4. federation links");
+await checkFederationLinks();
+
+/**
+ * Peers, read from both sides (network N0). Every finding is a warning, never a failure.
+ * The checker is loaded from the framework (packages/admin/lib/federation/) or, in an instance, the vendored
+ * copy (scripts/lib/federation/); with neither, the section says so and passes.
+ * The small PeerIO below mirrors packages/admin/server/federation-io.ts (TypeScript, so it cannot be imported here).
+ */
+async function checkFederationLinks() {
+  let mods = null;
+  for (const dir of [new URL("../packages/admin/lib/federation/", import.meta.url), new URL("./lib/federation/", import.meta.url)]) {
+    if (!existsSync(fileURLToPath(new URL("read.mjs", dir))) || !existsSync(fileURLToPath(new URL("peers.mjs", dir)))) continue;
+    try {
+      mods = { ...(await import(new URL("read.mjs", dir).href)), ...(await import(new URL("peers.mjs", dir).href)) };
+      break;
+    } catch {
+      continue;
+    }
+  }
+  if (!mods) {
+    console.log("  · federation links: not checked here (no checker in this checkout)");
+    return;
+  }
+  if (!existsSync(fedPath)) return;
+
+  let doc;
+  try {
+    doc = yaml.load(readFileSync(fedPath, "utf-8"));
+  } catch {
+    return; // an unreadable federation.yaml is reported elsewhere
+  }
+
+  const io = {
+    resolve: (base, rel) => path.resolve(base, rel),
+    isDir: (abs) => { try { return statSync(abs).isDirectory(); } catch { return false; } },
+    readFederationAt: (abs) => {
+      const file = path.join(abs, "federation.yaml");
+      if (!existsSync(file)) return { found: false };
+      try { return { found: true, doc: yaml.load(readFileSync(file, "utf-8")) }; }
+      catch (e) { return { found: true, error: String(e?.message ?? e).split("\n")[0] }; }
+    },
+  };
+
+  // This instance is its folder and its `origin` remote only, as the admin's fleet reads it: an `upstream` (the
+  // framework template) or any other remote is someone else's repository, and a peer listing it doesn't list us.
+  let remotes = [];
+  const git = spawnSync("git", ["remote", "-v"], { cwd: rootDir, encoding: "utf-8" });
+  if (git.status === 0 && git.stdout) {
+    remotes = [...new Set(git.stdout.split("\n").map((l) => l.trim().split(/\s+/)).filter(([name, url]) => name === "origin" && url).map(([, url]) => url))];
+  }
+
+  const { peers, problems, networks, join } = mods.readFederation(doc);
+  for (const p of problems) warn(p.text);
+  let findings = problems.length;
+
+  // A hub or join.where is published only as a public https address (github.com/… without a scheme counts).
+  const publicHref = mods.publicHref ?? ((u) => (mods.isPublicUrl(u) ? u : null));
+  for (const n of networks) {
+    if (n.hub === null || publicHref(n.hub) !== null) continue;
+    warn(`network "${n.name}": its hub isn't a public https address, so it won't be published`);
+    findings++;
+  }
+  if (join?.where && publicHref(join.where) === null) {
+    warn("join.where isn't a public https address, so it won't be published");
+    findings++;
+  }
+
+  const self = mods.selfAddresses(rootDir, remotes, io);
+  for (const peer of peers) {
+    const link = mods.linkState(peer, self, rootDir, io);
+    if (link.state === "claimed") warn(`peer "${peer.name}": only this side lists the link`);
+    else if (link.state === "not-an-instance") warn(`peer "${peer.name}": a repo, not an org-os instance — map it as a System in data/systems.yaml`);
+    else if (link.state === "unknown" && link.path) warn(`peer "${peer.name}": ${link.reason}`);
+    else continue;
+    findings++;
+  }
+  if (findings === 0) console.log(`  · federation links: ${peers.length} peer(s) read, nothing to flag`);
 }
 
 // --- Summary ---

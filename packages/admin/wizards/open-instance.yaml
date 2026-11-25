@@ -1,6 +1,7 @@
 # W1, first screens (wizards spec §5.4): open an organization. It collects the answers the framework's own
-# clone command reads and shows that command at the review. It runs nothing: creating a folder is a new
-# write path the platform does not have yet. Stops before "how it decides" and "starting set", which need
+# clone command reads. Inside an instance it shows that command at the review and runs nothing. In the
+# launcher (no instance behind it) the same wizard runs that command: the start step is skipped and the
+# review's action is "Create it". Stops before "how it decides" and "starting set", which need
 # the library and F2's rules, and before "run". lib/open-instance.mjs makes the config; a test asks the
 # command itself whether it accepts it.
 id: open-instance

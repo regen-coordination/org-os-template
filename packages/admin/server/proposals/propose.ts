@@ -41,6 +41,9 @@ export interface ProposeInput {
   rationale?: string
   /** Present means the proposal is recorded as a decision (§3.9); checked by the ledger's schema. */
   statement?: Record<string, unknown>
+  /** Where the change came from when it is not the author's own (network N2 Task 9, R13): a join request a hub received.
+   *  Set by the server from the validated request, never from a request body. */
+  origin?: { kind: 'federation-request'; request: string; from: string }
 }
 
 export interface ProposeDeps extends LedgerOptions {
@@ -240,6 +243,8 @@ export async function propose(repo: string, actor: Extract<Actor, { id: string }
     ...(deps.as ? { opened_as: deps.as } : {}),
     // A proposal made by Suggest (R-L6-SUGGEST-2): what decides it may be the built-in workspace/suggest.
     ...(deps.suggested ? { suggested: true } : {}),
+    // A change from outside the org (N2 R13): the request it was built from, named by its id and asker only.
+    ...(input.origin !== undefined ? { origin: { kind: input.origin.kind, request: input.origin.request, from: input.origin.from } } : {}),
     rev: revOf(ledgerOps),
     base: from,
     branch: `proposal/${id}`,

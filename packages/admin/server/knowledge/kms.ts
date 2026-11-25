@@ -66,6 +66,9 @@ export interface Kms {
   publishablePublicUse: readonly string[]
   /** kms's own field labels (KI K-14), so a field row is named as the page names it. */
   labelFor: (field: string, opts?: { config?: any; pack?: any }) => string
+  /** kms's XRPC client (`atproto/client.mjs`): login, putRecord, deleteRecord. Network N2 publishes the org's own link
+   *  records through it (Task 7), always with a guarded `fetchImpl`, never `globalThis.fetch`. */
+  createClient: (opts: { pds: string; fetchImpl: (url: string, init: any) => Promise<any> }) => any
 }
 
 export type KmsLoad = { ok: true; kms: Kms } | { ok: false; reason: string }
@@ -87,7 +90,7 @@ export async function kms(repo: string): Promise<KmsLoad> {
   const present = kmsPresence(repo)
   if (!present.ok) return present
   try {
-    const [fw, config, gate, model, reads, manifest, role, icons, labels] = await Promise.all([
+    const [fw, config, gate, model, reads, manifest, role, icons, labels, client] = await Promise.all([
       load(repo, 'framework.mjs'),
       load(repo, 'config.mjs'),
       load(repo, 'gate.mjs'),
@@ -97,6 +100,7 @@ export async function kms(repo: string): Promise<KmsLoad> {
       load(repo, 'planes/role.mjs'),
       load(repo, 'house/icons.mjs'),
       load(repo, 'pages/labels.mjs'),
+      load(repo, 'atproto/client.mjs'),
     ]) as any[]
     return {
       ok: true,
@@ -120,6 +124,7 @@ export async function kms(repo: string): Promise<KmsLoad> {
         privateFields: fw.PRIVATE_FIELDS ?? [],
         publishablePublicUse: fw.PUBLISHABLE_PUBLIC_USE ?? [],
         labelFor: labels.labelFor,
+        createClient: client.createClient,
       },
     }
   } catch (err) {

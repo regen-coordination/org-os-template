@@ -755,9 +755,10 @@ describe('assertWritablePath and commitPaths: where the server may write (DAO-OS
   it('accepts pages/a-1f2e.md, data/kb/claim.yaml, memory/2026-10-30.md and the rest of the list', () => {
     const dir = repoAt()
     for (const ok of ['pages/a-1f2e.md', 'data/kb/claim.yaml', 'memory/2026-10-30.md', 'data/members.yaml', 'IDENTITY.md', 'federation.yaml',
-      'MEMORY.md', 'HEARTBEAT.md', 'docs/plans/QUEUE.md', 'docs/agent-plans/a.md', 'pages/assets/a-1f2e/x.png']) {
+      'MEMORY.md', 'HEARTBEAT.md', 'docs/plans/QUEUE.md', 'docs/agent-plans/a.md', 'pages/assets/a-1f2e/x.png', 'federation/outgoing/4bbb2b60-849d-41f8-9144-f6bdacdb5ae5.yaml']) {
       expect(() => git.assertWritablePath(dir, ok), ok).not.toThrow()
     }
+    expect(() => git.assertWritablePath(dir, 'federation/other.yaml')).toThrow(/not a file the server writes/)
     expect(() => git.assertWritablePath(dir, 'DECISIONS.md')).toThrow(/ratify/)
     expect(() => git.assertWritablePath(dir, 'DECISIONS.md', { ratify: true })).not.toThrow()
   })

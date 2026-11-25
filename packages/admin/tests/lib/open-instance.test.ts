@@ -12,6 +12,13 @@ import { REAL_REPO } from '../fixtures.ts'
 
 const answers = { start: 'open', name: 'Alder Commons', type: 'LocalNode', description: 'A cooperative of seed keepers in the Alder valley.', language: 'en', license: 'MIT', folder: '../alder-commons', operatorName: 'Ana Costa', email: 'ana@alder.example' }
 
+describe('the default folder', () => {
+  it('sits beside the work, or inside a base', () => {
+    expect(defaultFolder('Alder Commons')).toBe('../alder-commons')
+    expect(defaultFolder('Alder Commons', '/w')).toBe('/w/alder-commons')
+  })
+})
+
 describe('the config draft', () => {
   it('is the file clone-framework takes: org and operator, nothing the command does not read', () => {
     const c = parse(cloneConfigText(answers)) as Record<string, any>

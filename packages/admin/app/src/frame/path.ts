@@ -24,6 +24,8 @@ const PLACES: Place[] = [
   { href: '/compose', label: 'Compose', parent: '/systems' },
   // DAO-OS L7 Task 18: the deployment's steps, under Systems beside Compose
   { href: '/deploy', label: 'Deploy', parent: '/systems' },
+  // network N2 Task 13: the networks this instance is in, its published links and the requests it takes, under Systems
+  { href: '/federation', label: 'Federation', parent: '/systems' },
   ...INSTANCE_LINKS.filter(l => !HOUSE_SECTIONS.some(s => s.href === l.href)),
   { href: '/parts', label: 'Parts' },
   ...GROUPS.map(g => ({ href: `/parts/${g.id}`, label: g.label, parent: '/parts' })),

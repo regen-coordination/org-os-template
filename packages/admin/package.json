@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "build": "vite build app",
     "start": "npm run build && tsx server/index.ts",
+    "open": "npm run build && tsx launcher/index.ts",
     "dev": "tsx watch server/index.ts",
     "dev:app": "vite app",
     "e2e": "npm run build && tsx tests/e2e/golden.mts && tsx tests/e2e/claim.mts && tsx tests/e2e/proposals.mts && tsx tests/e2e/signin.mts && tsx tests/e2e/workspace.mts && tsx tests/e2e/compose.mts",

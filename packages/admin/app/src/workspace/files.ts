@@ -38,6 +38,7 @@ export const EDITOR_WORDS: Record<string, string> = {
   knowledge: 'The commons’ entry page',
   generated: 'Generated from the records, never edited',
   ledger: 'The proposal routes',
+  'own-routes': 'The federation routes',
   ratify: 'Ratify, when a proposal is ratified',
 }
 export const editorWords = (editor: string): string => EDITOR_WORDS[editor] ?? editor
@@ -71,6 +72,7 @@ export function editorHref(row: { pattern: string; editor: string }): string {
     case 'library': return '/library'
     case 'knowledge': return '/c/knowledge'
     case 'ledger': return '/governance/proposals'
+    case 'own-routes': return '/b/federation-requests'
     case 'ratify': return '/governance/decisions'
     default: return filesHref(openable(row.pattern))
   }
@@ -107,6 +109,7 @@ export function ownEditor(path: string, editor: string): { href: string; label: 
     case 'library': return { href: '/library', label: 'Open the library' }
     case 'knowledge': return { href: '/c/knowledge', label: 'Open the commons' }
     case 'ledger': return { href: '/governance/proposals', label: 'Open the proposals' }
+    case 'own-routes': return { href: '/b/federation-requests', label: 'Open the join requests' }
     case 'ratify': return { href: '/governance/decisions', label: 'Open the decisions' }
     default: return null
   }

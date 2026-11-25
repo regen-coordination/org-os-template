@@ -10,6 +10,7 @@ export type Kind =
   | 'project' | 'person' | 'funding' | 'partner' | 'idea' | 'meeting' | 'event' | 'organization' | 'task' | 'knowledge-gaps'
   | 'module' | 'role' | 'seat' | 'instance' | 'source' | 'channel' | 'connector' | 'system'
   | 'proposal'
+  | 'federation-request'   // a join request this hub received (adapter `federation`)
   | 'knowledge'   // the commons: only what waits on a person (adapter `knowledge`)
   | 'absent'
 
@@ -52,6 +53,7 @@ export const BOARD_OF: Record<Exclude<Kind, 'absent'>, Board> = {
   source: 'systems', channel: 'systems', connector: 'systems',
   system: 'systems', // the default: the systems adapter places each entry by its section
   proposal: 'organization',
+  'federation-request': 'organization',
   knowledge: 'organization',
 }
 
@@ -80,6 +82,8 @@ export interface AdapterContext {
    *  the read is made from where the System is; the gate keeps that read from a viewer not admitted to them (PF-R256).
    *  Absent: git's entries alone. */
   privateStore?: PrivateAccess
+  /** The branch the server started on: where the trunk is read when governance names none. */
+  startBranch?: string
 }
 
 export interface Adapter {

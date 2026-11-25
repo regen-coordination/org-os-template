@@ -135,7 +135,7 @@ test('it writes the builder\'s files, dao.json from the identity with no templat
   writeFileSync(path.join(root, '.well-known', 'dao.json.template'), '{ "name": "{{ORGANIZATION_NAME}}" }\n');
   const r = run(root);
   assert.equal(r.status, 0, out(r));
-  assert.deepEqual(listing(root), ['activities.json', 'contracts.json', 'dao.json', 'dao.json.template', 'finances.json', 'governance.md',
+  assert.deepEqual(listing(root), ['activities.json', 'contracts.json', 'dao.json', 'dao.json.template', 'federation.json', 'finances.json', 'governance.md',
     'ideas.json', 'knowledge.json', 'meetings.json', 'members.json', 'projects.json', 'proposals.json']);
   assert.equal(readFileSync(path.join(root, '.well-known', 'dao.json.template'), 'utf-8'), '{ "name": "{{ORGANIZATION_NAME}}" }\n');
   const dao = read(root, 'dao.json');

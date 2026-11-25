@@ -10,6 +10,7 @@ import { contractsDoc, registrationProblems } from './contracts.mjs'
 import { proposalsDoc, activitiesDoc, snapshotEntries } from './proposals.mjs'
 import { grantPoolsDoc, applicationsDoc } from './grants.mjs'
 import { extraDocs } from './extras.mjs'
+import { federationDoc } from './federation.mjs'
 
 /** @typedef {import('./project.mjs').StandardsInput} StandardsInput */
 /** @typedef {import('./project.mjs').PublicInput} PublicInput */
@@ -32,7 +33,7 @@ import { extraDocs } from './extras.mjs'
 
 /** Every file the builder may write under .well-known/, in the order it writes them (L8 spec §5). */
 export const STANDARD_FILES = Object.freeze(['dao.json', 'members.json', 'proposals.json', 'activities.json', 'contracts.json', 'governance.md',
-  'grant-pools.json', 'applications.json', 'attestation-issuers.json', 'meetings.json', 'projects.json', 'finances.json', 'ideas.json', 'knowledge.json'])
+  'grant-pools.json', 'applications.json', 'attestation-issuers.json', 'meetings.json', 'projects.json', 'finances.json', 'ideas.json', 'knowledge.json', 'federation.json'])
 
 /**
  * Projection → documents → leak scan → schema validation. Pure. Files that have nothing to say (no grant pool, no
@@ -69,6 +70,7 @@ export function buildCore(input, options = {}) {
     ...(applications ? { 'applications.json': applications } : {}),
     ...(issuers ? { 'attestation-issuers.json': issuers } : {}),
     ...extraDocs(pub),
+    'federation.json': federationDoc(pub),
   }
   built['dao.json'] = daoDoc(pub, new Set(Object.keys(built)))
   problems.push(...contracts.problems, ...pools.problems, ...registrationProblems(pub))

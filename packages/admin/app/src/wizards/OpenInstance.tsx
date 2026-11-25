@@ -15,16 +15,25 @@ type Draft = Answers & { start?: string }
 const CONFIG_FILE = 'draft.yaml'
 const CHOOSE = 'Choose one.'
 
-/** W1's first screens (wizards spec §5.4). It collects what the framework's own `clone:framework` reads
- *  and shows that command at the review, with the config it takes. It runs nothing and writes nothing but
- *  its draft, which sits outside any repository: creating a folder is a write path this app does not have
- *  yet, so the wizard stops at the review and says so. */
-export default function OpenInstance({ def }: { def: WizardDef }) {
-  const draft = useQuery({ queryKey: ['draft', def.id], queryFn: () => api.wizardDraft(def.id), retry: false, refetchOnWindowFocus: false })
-  const actor = useQuery({ queryKey: ['actor'], queryFn: api.actor, staleTime: 60_000, retry: false })
+/** W1's first screens (wizards spec §5.4). It collects what the framework's own `clone:framework` reads, in two modes.
+ *  Inside an instance (no `run`) it shows that command at the review, with the config it takes: it runs nothing and
+ *  writes nothing but its draft, which sits outside any repository. In the launcher (`run` given; no instance behind it)
+ *  there is no intro, start step or draft: it opens at the questions, the review's action is "Create it", which calls
+ *  `run`, and Close (or Back from the first question) calls `onClose`. With `fixedFolder` (adopting a repo) the folder is
+ *  that repo: the answer is preset, its field is not drawn, and the review's action asks to see what would be added. */
+export default function OpenInstance({ def: given, run, base: folderBase, onClose, fixedFolder, initial }: { def: WizardDef; run?: (answers: Answers) => Promise<{ error: string } | void>; base?: string; onClose?: () => void; fixedFolder?: string; /** Answers preset by the caller (the launcher's Join door presets the type). */ initial?: Partial<Answers> }) {
+  // With `run` (the launcher: no instance behind it) the start step is skipped, no draft is read or kept, and the review
+  // creates the instance instead of showing the command.
+  const steps = run ? given.steps.filter(s => s.id !== 'start') : given.steps
+  const def = fixedFolder === undefined ? (run ? { ...given, steps } : given)
+    : { ...given, steps: steps.map(s => (s.fields ? { ...s, ...(s.id === 'org' ? { ask: 'What it is called and what kind it is.' } : {}), fields: s.fields.filter(f => f.id !== 'folder') } : s)) }
+  const draft = useQuery({ queryKey: ['draft', def.id], queryFn: () => api.wizardDraft(def.id), retry: false, refetchOnWindowFocus: false, enabled: !run })
+  const actor = useQuery({ queryKey: ['actor'], queryFn: api.actor, staleTime: 60_000, retry: false, enabled: !run })
+  const [running, setRunning] = useState(false)
+  const [runError, setRunError] = useState<string | null>(null)
   const [index, setIndex] = useState(0)
-  const [answers, setAnswers] = useState<Draft>({ language: 'en', license: 'MIT' })
-  const [folderTouched, setFolderTouched] = useState(false)
+  const [answers, setAnswers] = useState<Draft>({ language: 'en', license: 'MIT', ...initial, ...(run ? { start: 'open' } : {}), ...(fixedFolder !== undefined ? { folder: fixedFolder } : {}) })
+  const [folderTouched, setFolderTouched] = useState(fixedFolder !== undefined)
   const [copied, setCopied] = useState(false)
   const canWrite = useCanWrite()
 
@@ -36,7 +45,7 @@ export default function OpenInstance({ def }: { def: WizardDef }) {
     if (id === 'folder') setFolderTouched(true)
     setAnswers(a => {
       const next = { ...a, [id]: value }
-      if (id === 'name' && !folderTouched) next.folder = defaultFolder(value)
+      if (id === 'name' && !folderTouched) next.folder = defaultFolder(value, run ? folderBase : undefined)
       return next
     })
   }
@@ -66,24 +75,30 @@ export default function OpenInstance({ def }: { def: WizardDef }) {
   // (C6, C-23), so a preview leaves no draft behind as the person types.
   const kept = useRef('')
   useEffect(() => {
-    if (!canWrite) return
+    if (!canWrite || run) return
     if (m.state !== 'step' && m.state !== 'review') return
     const body = { index, answers }
     const text = JSON.stringify(body)
     if (text === kept.current) return
     kept.current = text
     api.saveWizardDraft(def.id, body).catch(() => { /* a draft is a convenience */ })
-  }, [m.state, index, answers, def.id, canWrite])
+  }, [m.state, index, answers, def.id, canWrite, run])
+
+  // In the launcher the intro is skipped: the run starts at the first question. Once: StrictMode runs this effect twice in dev.
+  const started = useRef(false)
+  useEffect(() => { if (run && !started.current) { started.current = true; m.send('START') } }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const view = m.state as WizardView
   const base = { title: def.title, steps: def.steps.map(s => s.title), view, index, status: m.shows.text,
     refusal: view === 'step' && invalid === null ? null : m.refusal }
 
-  if (draft.isPending) return <Skeleton rows={4} shape="row-1" label={def.title} />
+  if (draft.isPending && !run) return <Skeleton rows={4} shape="row-1" label={def.title} />
   // Save and leave: the answers are kept as a draft (the machine's closed state says so). Previewing draws no write
   // control (C6, C-23), and keeping a draft is a write to the server: neither the control nor the write is made (the
   // effect above stops at `canWrite`). Start, Continue, Back and Copy write nothing.
   const leave = { label: 'Save and leave', onClick: () => m.send('CANCEL') }
+  const close = onClose ? { label: 'Close', onClick: onClose } : undefined
+  if (run && view === 'intro') return null
 
   if (view === 'intro') {
     return (
@@ -99,13 +114,35 @@ export default function OpenInstance({ def }: { def: WizardDef }) {
   if (view === 'step') {
     return (
       <WizardFrame {...base} heading={step.title} ask={step.ask} writes={step.writes}
-        actions={{ ...(canWrite ? { cancel: leave } : {}), back: { label: 'Back', onClick: () => m.send('BACK') }, next: { label: 'Continue', onClick: () => m.send('NEXT') } }}>
+        actions={{ ...(close ? { cancel: close } : canWrite ? { cancel: leave } : {}), back: { label: 'Back', onClick: () => (close && index === 0 ? close.onClick() : m.send('BACK')) }, next: { label: 'Continue', onClick: () => m.send('NEXT') } }}>
         <StepBody step={step} values={answers as Record<string, string | undefined>} onChange={set} />
       </WizardFrame>
     )
   }
 
   if (view === 'review') {
+    if (run) {
+      const create = async () => {
+        setRunning(true); setRunError(null)
+        try {
+          const r = await run(answers)
+          if (r && 'error' in r) setRunError(r.error)
+        } catch (err) { setRunError(err instanceof Error ? err.message : String(err)) } finally { setRunning(false) }
+      }
+      const adopting = fixedFolder !== undefined
+      return (
+        <WizardFrame {...base} status={running ? (adopting ? 'Making the files…' : 'Creating it…') : adopting ? 'Review. Nothing is written to your repo yet.' : 'Review. Nothing is made until you choose Create it.'} refusal={runError} heading="Check the answers"
+          ask={adopting ? 'Nothing is written to your repo yet. Next you see every file it would add.' : 'Create it makes the folder and its first commit.'}
+          writes={adopting ? 'Nothing in your repo yet. The files are made in a scratch folder first, so you can see what would be added.' : 'A new folder with the instance in it, and its first git commit.'}
+          actions={{ ...(close ? { cancel: { ...close, disabled: running } } : {}), back: { label: 'Back', onClick: () => m.send('BACK'), disabled: running }, next: { label: adopting ? 'See what it adds' : 'Create it', onClick: () => void create(), disabled: running } }}>
+          <p className="wiz-label">{adopting ? 'Repo' : 'Folder'}</p>
+          <pre className="wiz-log">{answers.folder}</pre>
+          <p className="wiz-label">Config</p>
+          <pre className="wiz-log">{cloneConfigText(answers)}</pre>
+          {!adopting && <p className="wiz-note">The framework makes the folder and refuses one that already holds files. It never deletes.</p>}
+        </WizardFrame>
+      )
+    }
     const command = cloneCommand(answers, CONFIG_FILE)
     const copy = () => {
       void Promise.resolve(navigator.clipboard?.writeText(command)).then(() => setCopied(true), () => setCopied(false))

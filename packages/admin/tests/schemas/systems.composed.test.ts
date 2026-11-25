@@ -45,8 +45,16 @@ describe('composed Systems in the schema (Q58)', () => {
   // L7's fields that the compose canvas writes (deployment, role, position, order) belong to no kind: drawn where held.
   it('names the kinds each of L7’s fields belongs to', () => {
     const props = (JSON.parse(readFileSync(join(PACKAGE_SCHEMAS, 'systems.schema.json'), 'utf8')) as { properties: Record<string, { 'x-kinds'?: string[] }> }).properties
-    expect(Object.fromEntries(['branch', 'files', 'hats', 'signer_gate', 'deployment', 'role', 'position', 'order'].map(k => [k, props[k]!['x-kinds']]))).toEqual({
-      branch: ['repo'], files: ['repo'], hats: ['hats-tree'], signer_gate: ['safe'], deployment: [], role: [], position: [], order: [],
+    expect(Object.fromEntries(['branch', 'files', 'hats', 'signer_gate', 'deployment', 'role', 'position', 'order', 'mount', 'purpose'].map(k => [k, props[k]!['x-kinds']]))).toEqual({
+      branch: ['repo'], files: ['repo'], hats: ['hats-tree'], signer_gate: ['safe'], deployment: [], role: [], position: [], order: [], mount: ['repo'], purpose: ['repo'],
     })
+  })
+  it('a repo System may say where its clone lives and what it is; a mount that climbs out is refused', () => {
+    const repo = { id: 'site', kind: 'repo', name: 'Site', url: 'https://github.com/a/site' }
+    expect(errs({ ...repo, mount: 'repos/site', purpose: 'website' })).toEqual([])
+    expect(errs({ ...repo, mount: null, purpose: null })).toEqual([])
+    expect(errs({ ...repo, mount: '../escape' }).length).toBeGreaterThan(0)
+    expect(errs({ ...repo, mount: '/abs/path' }).length).toBeGreaterThan(0)
+    expect(errs({ ...repo, purpose: 'toy' }).length).toBeGreaterThan(0)
   })
 })

@@ -125,7 +125,7 @@ test('a clone carries the vendored standards builder, its npm script, its workfl
   assert.match(log, /\[stage 5\] vendored the standards generator: \d+ files into scripts\/lib\//);
 
   const pkg = JSON.parse(readFileSync(path.join(dir, 'package.json'), 'utf-8'));
-  assert.equal(pkg.scripts['generate:schemas'], 'node scripts/generate-all-schemas.mjs');
+  assert.equal(pkg.scripts['generate:schemas'], 'node scripts/generate-all-schemas.mjs && node scripts/repos-manifest.mjs');
   assert.ok(pkg.dependencies['js-yaml'], 'the CLI parses YAML with js-yaml');
   assert.ok(existsSync(path.join(dir, '.github', 'workflows', 'generate-schemas.yml')));
   // Framework-only suites that need packages/admin do not travel.

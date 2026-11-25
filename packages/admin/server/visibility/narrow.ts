@@ -35,7 +35,7 @@ import type { PendingRow, PrivateField, PrivateStore, PrivateWriter, StagedRow }
 import { readConfig } from './config.ts'
 import { mayWrite, readRuleContext } from '../governance/effective.ts'
 import {
-  admits, DEPLOYED_SYSTEM_REQUIRES, formatLevel, fullLevel, gitAllows, narrowerOrEqual, parseLevel, readFullPolicy, requiredInGit,
+  admits, DEPLOYED_SYSTEM_REQUIRES, formatLevel, fullLevel, gitAllows, narrowerOrEqual, NEVER_WIDENED, parseLevel, readFullPolicy, requiredInGit,
   type ParsedLevel, type Viewer, type VisibilityPolicy,
 } from '../../lib/visibility.mjs'
 import { CARRIED_EVENTS, governanceNamesOf, LEAVES_GIT, NARROW_RULE, narrowSubject, PAGE_LEAVES_GIT, referrersInWords, ROSTER, substituteOps, takenOutOfGit, WIDENS, withoutFields } from '../../lib/narrow.mjs'
@@ -65,7 +65,7 @@ const LEDGER = 'data/proposals.yaml'
 const knownOf = (repo: string): ReadonlySet<string> => new Set(registriesOf(repo).map(r => r.name))
 // Knowledge (L6 §7.5, a file per kind) is not narrowed here: what the commons shows is kms's gate's, decided as a
 // publication (Q69); a narrowing writes one registry file, and the canon has many.
-const collectionsOf = (repo: string): ReadonlySet<string> => new Set(registriesOf(repo).filter(r => r.kind === 'collection' && !r.ledger && r.filesGlob === undefined).map(r => r.name))
+const collectionsOf = (repo: string): ReadonlySet<string> => new Set(registriesOf(repo).filter(r => r.kind === 'collection' && !r.ledger && !NEVER_WIDENED.includes(r.name) && r.filesGlob === undefined).map(r => r.name))
 const NOTHING = 'Nothing was written.'
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
 const held = (v: unknown) => v !== undefined && v !== null
