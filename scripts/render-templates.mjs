@@ -19,6 +19,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import yaml from "js-yaml";
 import { render } from "../templates/render.mjs";
+import { downstreamList } from "./lib/readme-downstream.mjs";
 import { SITE_URL } from "../site/base.config.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -78,11 +79,7 @@ const data = {
   federation: {
     network: fed.network || "",
     peers: (fed.peers || []).map((p) => (typeof p === "string" ? p : p.id || p.name)).filter(Boolean),
-    downstream: (instancesYaml.instances || []).map((i) => ({
-      name: i.id || i.name,
-      type: i.type || "instance",
-      status: i.status || "unknown",
-    })),
+    downstream: downstreamList(instancesYaml),
   },
   counts: {
     // data/skills-matrix.yaml also carries unpromoted candidates (DAO-module skills

@@ -21,6 +21,8 @@ orgs (single-operator dogfood; external pilot is the open milestone). The config
 engine that does this is shipped and tested — it produced a real instance, bread-coop-os. No
 SaaS, no lock-in — markdown, YAML, and git.
 
+To open, create or adopt an instance from a page on your own machine, run `npm run open` (see [docs/OPENING.md](docs/OPENING.md)).
+
 ## How it's organized
 
 Three nouns. Everything else is detail.
@@ -40,11 +42,36 @@ of inventing its own.
 - **Run a session.** `/initialize` renders a dashboard from live data — projects, tasks,
   calendar, funding deadlines, federation status. `/close` writes memory and commits.
 - **Keep organizational memory.** Daily logs, an indexed long-term memory, and an append-only
-  decision record. Greppable, versioned, agent-readable.
+  decision record. Greppable, versioned, agent-readable. Memory only the Council may read goes to
+  the running Hub instead of git (`npm run memory`).
+- **Run the Hub.** `packages/admin` is a web app for an instance: its records, the rules that
+  decide changes, proposals, boards, outside systems, and the workspace (pages, collections,
+  tasks, comments). A change to the instance's files is a git commit. Run it on your own machine
+  (`npm run admin -- --repo <instance>`, or from the launcher, `npm run open`), or host it for
+  members from one container image ([`deploy/hub/`](deploy/hub/RAILWAY.md)). A hosted Hub writes
+  nothing to its instance until writes are turned on; it reads the instance and follows its remote.
+  See [`docs/ADMIN-APP.md`](docs/ADMIN-APP.md).
+- **Sign members in.** By an emailed link; with a Bluesky or Certified account (identity only,
+  since 0.7.5; on a hosted Hub it is off until the operator sets its key); or with a wallet when the
+  org names a Hats tree. A person's Roles decide what they read.
+- **Keep what is private out of git.** `data/visibility.yaml` says what is public. Anything
+  stricter than members lives in the Hub's private store, outside the repository, with sealed
+  backups. Since 0.7.2 its optional `files:` section says which Roles read which `data/**` files
+  whole.
 - **Publish machine-readable org data.** EIP-4824/DAOstar `.well-known/` descriptors generated
-  from your registries — extended with meetings, projects, finances, and skills.
-- **Federate.** Publish schemas, subscribe to peers, share skills, keep sovereignty. Drift
-  analysis and pull-based migrations mean the framework never breaks downstream.
+  from your registries — extended with meetings, projects, finances, ideas and federation. Only
+  what `data/visibility.yaml` makes public, and only once `identity.daoURI` is set.
+- **Federate.** Declare peers, upstream and downstream in `federation.yaml`; keep instances
+  current with `npm run doctor -- sync` and see their drift with `npm run analyze:instances`.
+  Since 0.7.4 an instance can ask to join a hub's network from the Federation page of a Hub on a
+  member's own machine (those routes are off on a hosted Hub), and each side publishes its half of the link as a record in its own atproto account. That has been tested
+  against a mocked atproto server, not yet run on live accounts, and the network's record type is
+  a placeholder that a live account refuses. Knowledge exchange between peers, skill sharing and
+  trust enforcement are not built ([`docs/FEDERATION.md`](docs/FEDERATION.md#not-built)).
+- **Keep a knowledge commons.** `packages/org-os-kms` keeps the org's knowledge as typed
+  objects, publishes the public ones (as JSON, readable pages and, opt-in, atproto records), and
+  draws the federation map. The Hub's knowledge pages (`/c/knowledge`) work on a member's own
+  machine; the hosted image does not carry kms. See [`docs/KMS.md`](docs/KMS.md).
 - **Work from a browser or a chat.** The Cloudflare OS module puts the dashboard and an
   org-literate agent in a workspace, so members who will never touch git can still read the org
   and submit to it.
@@ -89,6 +116,12 @@ npm run install:hooks    # pre-commit + advisory hooks
 npm run selftest         # full reliability check
 ```
 
+One admin test, the *no-names* guard (`packages/admin/app/src/test/no-names.test.ts`), keeps real
+people's names out of fixtures and screens. The repository is public, so the names it looks for are
+never committed: list them in `.org-os/names.local` at the repository root, one per line (`#` starts
+a comment, blank lines are skipped; matched as whole words, any case). The file is git-ignored.
+Without it the guard is skipped and says so.
+
 ### You're an **agent** opening a session
 
 Read `MASTERPLAN.md`, `SOUL.md`, `IDENTITY.md`, then run `/initialize`. `AGENTS.md` has the
@@ -105,7 +138,7 @@ Start with `SOUL.md` (mission and values), `IDENTITY.md` (what we are), then
 
 {{#if federation.downstream}}
 {{#each federation.downstream}}
-- **{{ name }}** ({{ type }}) — {{ status }}
+- **{{ name }}** ({{ type }}){{#if maturity }} — {{ maturity }}{{/if}}
 {{/each}}
 {{/if}}
 

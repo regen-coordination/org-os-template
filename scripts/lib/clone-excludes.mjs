@@ -198,6 +198,8 @@ export const EXCLUDE_FILES = new Set([
   "tests/fixtures/bread-coop-config.yaml", // tests/instance-doctor
   // Renders the FRAMEWORK's README and session one-pager; imports site/ (excluded).
   "scripts/render-templates.mjs",
+  "scripts/lib/readme-downstream.mjs", // read only by render-templates.mjs
+  "tests/scripts/readme-downstream.test.mjs",
   "templates/README.framework.md",
   "templates/session-one-pager.md",
   // The clone manifest and its generator describe the framework's generator.
