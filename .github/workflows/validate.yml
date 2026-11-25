@@ -44,13 +44,6 @@ jobs:
         working-directory: packages/admin
         run: npm ci
 
-      # The site's client bundle imports d3-force via
-      # packages/org-os-federation-map; without this the site build below fails
-      # to resolve it on a runner.
-      - name: Install federation-map dependencies
-        working-directory: packages/org-os-federation-map
-        run: npm ci
-
       - name: Install site dependencies
         working-directory: site
         run: npm ci
