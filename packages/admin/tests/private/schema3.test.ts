@@ -62,8 +62,10 @@ INSERT INTO comments VALUES ('cmt_1', 'page:p-1', NULL, NULL, 'steward-a', 'kept
 INSERT INTO view_state VALUES ('steward-a', 'tasks', '{"view":"open"}');
 PRAGMA user_version = 2;
 `
-const ALL_TABLES = ['applied', 'collections', 'comments', 'drafts', 'email_keys', 'fields', 'history', 'mentions', 'notifications', 'pending',
-  'reads', 'records', 'roles', 'roles_meta', 'sessions', 'sign_in_links', 'staged', 'view_state']
+// Schema 4 (the ReFi DAO Network, B1) adds five tables of its own: account_links, network_entries, network_guests,
+// oauth_sessions, oauth_state.
+const ALL_TABLES = ['account_links', 'applied', 'collections', 'comments', 'drafts', 'email_keys', 'fields', 'history', 'mentions', 'network_entries',
+  'network_guests', 'notifications', 'oauth_sessions', 'oauth_state', 'pending', 'reads', 'records', 'roles', 'roles_meta', 'sessions', 'sign_in_links', 'staged', 'view_state']
 const DOC: RolesDoc = {
   roles_version: '2026-11-25',
   people: [{ id: 'example-org:person:example-lead', name: 'Example Lead', email_keys: ['b'.repeat(64)], roles: ['node-lead'], nodes: ['node-one'] }],
@@ -84,16 +86,16 @@ function tablesOf(file: string): { tables: string[]; version: number } {
 
 describe('the private store, schema 3: both lines\' tables', () => {
   it('SCHEMA_VERSION is 3, and a fresh store has every table of both lines', async () => {
-    expect(SCHEMA_VERSION).toBe(3)
+    expect(SCHEMA_VERSION).toBe(4) // 4 (B1) adds the network's five tables on top of both lines'
     const s = await opened(repo(), temp('schema3-fresh-'))
-    expect(tablesOf(s.file)).toEqual({ tables: ALL_TABLES, version: 3 })
+    expect(tablesOf(s.file)).toEqual({ tables: ALL_TABLES, version: 4 })
   })
 
   it('a schema 2 store 0.6.1 wrote opens at 3 with the workspace\'s tables, its Roles and records kept', async () => {
     const r = repo(), dir = temp('schema3-main2-')
     written(dir, MAIN_2)
     const s = await opened(r, dir)
-    expect(tablesOf(s.file)).toEqual({ tables: ALL_TABLES, version: 3 })
+    expect(tablesOf(s.file)).toEqual({ tables: ALL_TABLES, version: 4 })
     expect(s.record('grievances', 'g-1')?.body).toEqual({ note: 'kept' })
     expect(s.person('example-org:person:example-steward')).toMatchObject({ name: 'Example Steward', roles: ['steward'] })
     expect(s.rolesVersion()).toBe('2026-11-18')
@@ -106,7 +108,7 @@ describe('the private store, schema 3: both lines\' tables', () => {
     const r = repo(), dir = temp('schema3-ws2-')
     written(dir, WORKSPACE_2)
     const s = await opened(r, dir)
-    expect(tablesOf(s.file)).toEqual({ tables: ALL_TABLES, version: 3 })
+    expect(tablesOf(s.file)).toEqual({ tables: ALL_TABLES, version: 4 })
     expect(s.comment('cmt_1')).toMatchObject({ body: 'kept', task: null })
     expect(s.viewState('steward-a', 'tasks')).toEqual({ view: 'open' })
     // The Roles' tables work at once.

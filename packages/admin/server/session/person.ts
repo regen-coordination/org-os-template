@@ -2,12 +2,12 @@
 // house's key and issuer, not expired), its session row must be live, and the person must be in the Roles table now.
 // The house reads the Roles from the table, never from the claims, so a Role removed at a reload stops here at once;
 // the org's other sites read the claims, for at most 24 h, and a re-issue under 12 h carries the Roles as they are now.
-import type { PrivateStore, RolesPerson } from '../private/store.ts'
+import type { NetworkGuest, PrivateStore, RolesPerson } from '../private/store.ts'
 import type { PersonActor } from '../actor.ts'
 import type { SignInConfig } from './config.ts'
 import { personSessionHash } from './sessions.ts'
 import {
-  clearedSessionCookie, REISSUE_UNDER_S, sessionCookie, signSession, verifySession, SESSION_TTL_S, type SessionClaims,
+  clearedSessionCookie, newSessionClaims, REISSUE_UNDER_S, sessionCookie, signSession, verifySession, SESSION_TTL_S, type SessionClaims,
 } from '../../lib/session-token.mjs'
 
 export type { PersonActor }
@@ -21,6 +21,9 @@ export function viewerRoles(person: RolesPerson, governanceRoles: string[]): str
  *  store); or a person no longer on the records. Null: no cookie of this house's name, or one that does not verify. */
 export type PersonCookie =
   | { kind: 'person'; person: RolesPerson; claims: SessionClaims }
+  // A ReFi DAO Network Guest (refi-dao-os network app spec §5.1, §5.7): signed in with a Bluesky or Certified account
+  // that is linked to no person. `sub` is guest:<did>, no Roles; read against the Guest table, as a person against Roles.
+  | { kind: 'guest'; guest: NetworkGuest; claims: SessionClaims }
   | { kind: 'ended'; claims: SessionClaims }
   | { kind: 'removed'; claims: SessionClaims }
 
@@ -42,8 +45,28 @@ export function readPersonCookie(store: PrivateStore, cfg: SignInConfig, header:
   if (!claims) return null
   const row = store.session(personSessionHash(claims.jti))
   if (!row || row.account !== claims.sub || Date.parse(row.expires) <= at.getTime()) return { kind: 'ended', claims }
+  if (claims.sub.startsWith(GUEST_PREFIX)) {
+    const guest = store.guest(claims.sub.slice(GUEST_PREFIX.length))
+    return guest ? { kind: 'guest', guest, claims } : { kind: 'removed', claims }
+  }
   const person = store.person(claims.sub)
   return person ? { kind: 'person', person, claims } : { kind: 'removed', claims }
+}
+
+/** A Guest's `sub`: guest:<did>, so no consumer can take it for a person id (network app spec §5.7). */
+export const GUEST_PREFIX = 'guest:'
+
+/** I5's steps 3–6, the one way a session is issued (the emailed link, and a Bluesky or Certified account): the claims
+ *  for `who` at `at`, the row by which the house ends the session (sign-out, a removed person or Guest), and the
+ *  Set-Cookie value of the shared cookie. */
+export async function issueSession(store: PrivateStore, cfg: SignInConfig, who: { sub: string; roles: string[]; nodes: string[] }, at: Date): Promise<string> {
+  const claims = newSessionClaims({ iss: cfg.issuer, sub: who.sub, roles: who.roles, nodes: who.nodes }, at)
+  await store.deleteSessionsExpired(at.toISOString())
+  await store.putSession({
+    tokenHash: personSessionHash(claims.jti), account: who.sub,
+    created: new Date(claims.iat * 1000).toISOString(), expires: new Date(claims.exp * 1000).toISOString(),
+  })
+  return sessionCookie(signSession(claims, cfg.privateJwk), cfg.cookie)
 }
 
 /** The signed-in person an I5 cookie names, or null (Task 9's signature). */

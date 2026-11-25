@@ -22,6 +22,7 @@ function app(o: { trustProxy?: boolean; now?: () => number } = {}): Hono {
   a.use('*', rateLimits({ trustProxy: o.trustProxy ?? true, ...(o.now ? { now: o.now } : {}) }))
   a.post('/api/session/nonce', c => c.json({ nonce: 'n' }))
   a.post('/api/session', c => c.json({ ok: true }))
+  a.post('/api/session/atproto/start', c => c.json({ url: 'https://x.example/' }))
   a.get('/api/proposals/:id', c => c.json({ id: c.req.param('id') }))
   a.put('/api/registries/:name/:id', c => c.json({ ok: true }))
   return a
@@ -72,6 +73,17 @@ describe('rateLimits', () => {
     expect((await a.request('/api/session/nonce', { method: 'POST', headers: from(B) })).status).toBe(200)
     // sign-in has its own bucket: the nonce's being spent does not spend it
     expect((await a.request('/api/session', { method: 'POST', headers: from(A) })).status).toBe(200)
+  })
+
+  // refi-dao-os network app spec §5.1 (B2): starting a Bluesky or Certified sign-in makes the Hub call another server,
+  // so it is held to the sign-in's rate per address (10/min, burst 5), in a bucket of its own.
+  it('the 6th AT Proto sign-in start from one address at once is 429; the nonce\'s bucket is not spent by it', async () => {
+    const a = app({ now: () => 0 })
+    const statuses: number[] = []
+    for (let i = 0; i < 6; i++) statuses.push((await a.request('/api/session/atproto/start', { method: 'POST', headers: from(A) })).status)
+    expect(statuses).toEqual([200, 200, 200, 200, 200, 429])
+    expect((await a.request('/api/session/atproto/start', { method: 'POST', headers: from(B) })).status).toBe(200)
+    expect((await a.request('/api/session/nonce', { method: 'POST', headers: from(A) })).status).toBe(200)
   })
 
   it('writes are limited per session, reads per address', async () => {

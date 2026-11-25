@@ -13,6 +13,7 @@ import { personOf, viewerOf } from '../request.ts'
 import { endPersonSession } from './person.ts'
 import { personName } from './names.ts'
 import { clearedSessionCookie } from '../../lib/session-token.mjs'
+import { safeReturn } from '../../lib/return-url.mjs'
 import type { SignInConfig } from './config.ts'
 
 /** §4.3 step 3's refusal: the signature recovers to another address than the message's. */
@@ -47,6 +48,8 @@ export interface SessionDeps {
   /** The emailed-link sign-in (Lane 3 Task 9), as `readSignInConfig` read it: null when it is not offered. Given (even
    *  null), `GET /api/session` also says which methods are offered and whether the instance is written to. */
   signIn?: SignInConfig | null
+  /** The AT Proto sign-in (refi-dao-os network app spec §5.1, B2) is configured: `GET /api/session` offers `atproto`. */
+  atproto?: boolean
   /** `HOUSE_INSTANCE_WRITES` (Lane 3 Task 11), for `GET /api/session`; 'on' until that switch is wired. */
   instanceWrites?: 'on' | 'off'
   now?: () => Date
@@ -99,7 +102,7 @@ export function mountSession(app: Hono, d: SessionDeps): void {
   /** With the email method wired (`signIn` given): the methods offered — `email` when it is configured and the store is
    *  open, `wallet` when a tree is named too — and whether the instance is written to. Without it, L5's answer as it was. */
   const offered = (tree: unknown) => 'signIn' in d ? {
-    methods: [...(d.signIn && d.store ? ['email'] : []), ...(tree ? ['wallet'] : [])],
+    methods: [...(d.signIn && d.store ? ['email'] : []), ...(d.atproto && d.store ? ['atproto'] : []), ...(tree ? ['wallet'] : [])],
     instanceWrites: d.instanceWrites ?? 'on',
   } : {}
 
@@ -117,6 +120,14 @@ export function mountSession(app: Hono, d: SessionDeps): void {
         mode, signedIn: true, via: 'email', actor: person.id,
         person: { id: person.id, name: nameOfPerson(c, person), roles: person.roles, nodes: person.nodes },
         viewer: viewerOf(c).kind, expiresAt: new Date(claims.exp * 1000).toISOString(),
+        signIn: tree ? { chainId: tree.chain, tree: tree.ref } : null, ...offered(tree), ...portalField,
+      })
+    }
+    // A ReFi DAO Network Guest (network app spec §5.1): signed in with their account, holding no Role.
+    if (p?.kind === 'guest') {
+      return c.json({
+        mode, signedIn: true, via: 'atproto', guest: { did: p.guest.did, handle: p.guest.handle }, roles: [],
+        viewer: viewerOf(c).kind, expiresAt: new Date(p.claims.exp * 1000).toISOString(),
         signIn: tree ? { chainId: tree.chain, tree: tree.ref } : null, ...offered(tree), ...portalField,
       })
     }
@@ -194,6 +205,10 @@ export function mountSession(app: Hono, d: SessionDeps): void {
       const p = personOf(c)
       const cleared = p && d.store ? await endPersonSession(d.store, d.signIn, p.claims) : clearedSessionCookie(d.signIn.cookie)
       c.header('set-cookie', cleared, { append: true })
+      // Signing out from another of the org's sites (the network site, final review of its B8): where to go back, as the
+      // I6 rule judges it, for the Hub's sign-out page to follow.
+      const ret = c.req.query('return')
+      if (ret !== undefined) return c.json({ next: safeReturn(ret, d.signIn.issuer, d.signIn.cookie.domain) })
     }
     return c.body(null, 204)
   })

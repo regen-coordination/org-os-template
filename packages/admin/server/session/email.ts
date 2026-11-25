@@ -8,7 +8,8 @@
 // link's page never spends it.
 import { randomBytes } from 'node:crypto'
 import type { Context, Hono } from 'hono'
-import { emailKey, newSessionClaims, sessionCookie, signSession } from '../../lib/session-token.mjs'
+import { emailKey } from '../../lib/session-token.mjs'
+import { issueSession } from './person.ts'
 import { safeReturn } from '../../lib/return-url.mjs'
 import { orgName } from '../resources/util.ts'
 import type { PrivateStore } from '../private/store.ts'
@@ -16,7 +17,7 @@ import type { HostedConfig } from '../hosted/config.ts'
 import { Buckets, clientAddress } from '../hosted/limits.ts'
 import type { SignInConfig } from './config.ts'
 import type { Mailer } from './mail.ts'
-import { personSessionHash, tokenHash } from './sessions.ts'
+import { tokenHash } from './sessions.ts'
 
 /** How long an emailed link works (I6): 15 minutes, once. */
 export const LINK_TTL_MS = 15 * 60_000
@@ -141,15 +142,9 @@ export function mountEmailSignIn(app: Hono, d: EmailSignInDeps): EmailSignIn {
     // 2. The person as the Roles are now: one removed since the link was sent does not sign in.
     const person = d.store.person(link.personId)
     if (!person) return refused()
-    // 3–4. The I5 claims, and the row by which the house ends the session (sign-out, a removed person).
-    const claims = newSessionClaims({ iss: d.config.issuer, sub: person.id, roles: person.roles, nodes: person.nodes }, at)
-    await d.store.deleteSessionsExpired(at.toISOString())
-    await d.store.putSession({
-      tokenHash: personSessionHash(claims.jti), account: person.id,
-      created: new Date(claims.iat * 1000).toISOString(), expires: new Date(claims.exp * 1000).toISOString(),
-    })
-    // 5–6. The cookie, and where to go.
-    c.header('set-cookie', sessionCookie(signSession(claims, d.config.privateJwk), d.config.cookie))
+    // 3–6. The I5 claims, the row by which the house ends the session (sign-out, a removed person), and the cookie: the
+    // one issuing function, shared with the Bluesky or Certified sign-in (network app B3).
+    c.header('set-cookie', await issueSession(d.store, d.config, { sub: person.id, roles: person.roles, nodes: person.nodes }, at))
     return c.json({ signedIn: true, return: link.returnTo })
   })
 

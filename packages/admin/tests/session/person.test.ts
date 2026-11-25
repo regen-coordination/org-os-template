@@ -68,7 +68,7 @@ function signInConfig(name = 'org_session_dev'): SignInConfig {
   return read.config
 }
 
-async function house(o: { tree?: boolean; config?: SignInConfig } = {}) {
+async function house(o: { tree?: boolean; config?: SignInConfig; atproto?: boolean } = {}) {
   const repo = makeFixtureRepo(); cleanup.push(() => rmSync(repo, { recursive: true, force: true }))
   writeFileSync(join(repo, 'data', 'members.yaml'), MEMBERS)
   writeFileSync(join(repo, 'data', 'governance.yaml'), GOVERNANCE)
@@ -89,7 +89,7 @@ async function house(o: { tree?: boolean; config?: SignInConfig } = {}) {
   const deps = { repo, hosted: true, membership, store, signIn, now }
   let email: EmailSignIn | undefined
   const app = createApp(repo, a => {
-    mountSession(a, { repo, store, membership, hosted: true, signIn, now })
+    mountSession(a, { repo, store, membership, hosted: true, signIn, now, ...(o.atproto ? { atproto: true } : {}) })
     email = mountEmailSignIn(a, { repo, store, config: signIn, mailer, now, hosted: hostedConfig })
     mountVisibility(a, { repo, membership })
   }, { request: withRequest(deps), hosted: true })
@@ -240,6 +240,12 @@ describe('the signed-in person on every request (Lane 3 Task 9)', () => {
     expect(await session(none)).toEqual({ mode: 'hosted', signIn: null, signedIn: false, methods: ['email'], instanceWrites: 'on' })
     const tree = await house({ tree: true })
     expect(await session(tree)).toMatchObject({ signIn: { chainId: CELO, tree: `${CELO}:13` }, methods: ['email', 'wallet'] })
+  })
+
+  // refi-dao-os network app spec §5.1 (B2): a network account (Bluesky or Certified) is a second way in, beside the link.
+  it('with the AT Proto client configured, atproto is offered too', async () => {
+    expect(await session(await house({ atproto: true }))).toMatchObject({ methods: ['email', 'atproto'] })
+    expect(await session(await house({ atproto: true, tree: true }))).toMatchObject({ methods: ['email', 'atproto', 'wallet'] })
   })
 
   it('a staging cookie name is not read by a production config', async () => {

@@ -135,9 +135,10 @@ export function withRequest(d: RequestDeps): MiddlewareHandler {
     // or a session the house ended: the row goes and the cookie is cleared.
     if (person && d.store && d.signIn && !sessionWrite) {
       try {
+        // A Guest's cookie is not re-issued (it ends after its 24 h; they sign in again) and is never ended here.
         const cookie = person.kind === 'person'
           ? (needsReissue(person.claims, now()) ? await reissue(d.store, d.signIn, person.person, person.claims, now()) : null)
-          : await endPersonSession(d.store, d.signIn, person.claims)
+          : person.kind === 'guest' ? null : await endPersonSession(d.store, d.signIn, person.claims)
         if (cookie) c.res.headers.append('set-cookie', cookie)
       } catch (err) {
         console.error(`org-os admin: a sign-in could not be renewed: ${err instanceof Error ? err.message : String(err)}`)

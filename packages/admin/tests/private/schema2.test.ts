@@ -32,8 +32,10 @@ PRAGMA user_version = 1;
 `
 const NEW_TABLES = ['comments', 'drafts', 'mentions', 'notifications', 'reads', 'view_state']
 // With the Roles, the email keys and the sign-in links (Lane 3 Task 2), which the same schema holds.
-const ALL_TABLES = ['applied', 'collections', 'comments', 'drafts', 'email_keys', 'fields', 'history', 'mentions', 'notifications', 'pending',
-  'reads', 'records', 'roles', 'roles_meta', 'sessions', 'sign_in_links', 'staged', 'view_state']
+// Schema 4 (the ReFi DAO Network, B1) adds five tables of its own: account_links, network_entries, network_guests,
+// oauth_sessions, oauth_state.
+const ALL_TABLES = ['account_links', 'applied', 'collections', 'comments', 'drafts', 'email_keys', 'fields', 'history', 'mentions', 'network_entries',
+  'network_guests', 'notifications', 'oauth_sessions', 'oauth_state', 'pending', 'reads', 'records', 'roles', 'roles_meta', 'sessions', 'sign_in_links', 'staged', 'view_state']
 const NOW = new Date('2026-10-30T12:00:00Z')
 
 const cleanup: string[] = []
@@ -133,9 +135,9 @@ describe('the private store, schema 2 (L6 §8.1)', () => {
   })
 
   it('SCHEMA_VERSION is 2, and a new store has the six new tables, STRICT, column for column', async () => {
-    expect(SCHEMA_VERSION).toBe(3) // schema 3 holds these tables and the Roles'
+    expect(SCHEMA_VERSION).toBe(4) // schema 3 holds these tables and the Roles'; 4 adds the network's
     const s = await opened(repo(), temp('schema2-'))
-    expect(tablesOf(s.file)).toEqual({ tables: ALL_TABLES, version: 3 })
+    expect(tablesOf(s.file)).toEqual({ tables: ALL_TABLES, version: 4 })
     const db = new DatabaseSync(s.file, { readOnly: true })
     try {
       const columns = (t: string) => (db.prepare(`PRAGMA table_info(${t})`).all() as { name: string }[]).map(c => c.name)
@@ -157,7 +159,7 @@ describe('the private store, schema 2 (L6 §8.1)', () => {
     versionOne(join(dir, 'house.db'))
     expect(tablesOf(join(dir, 'house.db')).version).toBe(1)
     const s = await opened(r, dir)
-    expect(tablesOf(s.file)).toEqual({ tables: ALL_TABLES, version: 3 })
+    expect(tablesOf(s.file)).toEqual({ tables: ALL_TABLES, version: 4 })
     expect(s.record('grievances', 'g-1')).toEqual({ collection: 'grievances', id: 'g-1', visibility: 'hat:Ops', body: { note: 'kept' }, rev: 'r1' })
     expect(s.collections()).toEqual([{ id: 'grievances', visibility: 'hat:Ops', definition: { fields: [{ id: 'note', type: 'text' }] } }])
     expect(s.session('h1')?.account).toBe('eip155:42220:0x00000000000000000000000000000000000000a1')
@@ -181,7 +183,7 @@ describe('the private store, schema 2 (L6 §8.1)', () => {
     await restore(r, file, keyFile, { dir: to, now: NOW })
     expect(tablesOf(join(to, 'house.db')).version).toBe(1) // restored as it was written
     const s = await opened(r, to)
-    expect(tablesOf(s.file)).toEqual({ tables: ALL_TABLES, version: 3 })
+    expect(tablesOf(s.file)).toEqual({ tables: ALL_TABLES, version: 4 })
     expect(s.record('grievances', 'g-1')?.body).toEqual({ note: 'kept' })
   })
 
@@ -195,7 +197,7 @@ describe('the private store, schema 2 (L6 §8.1)', () => {
     expect(Object.keys(made.counts).sort()).toEqual(ALL_TABLES)
     expect(made.counts).toMatchObject({ comments: 0, mentions: 0, notifications: 0, reads: 0, view_state: 1, drafts: 1 })
     const line = JSON.parse(readFileSync(join(backups, 'manifest.jsonl'), 'utf8').trim()) as { version: number }
-    expect(line.version).toBe(3)
+    expect(line.version).toBe(4)
   })
 })
 

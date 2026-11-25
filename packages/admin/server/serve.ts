@@ -7,6 +7,12 @@ import { serveStatic } from '@hono/node-server/serve-static'
 import { WebSocketServer, type WebSocket } from 'ws'
 import type { Hono } from 'hono'
 import { createApp } from './app.ts'
+import { mountAtproto, readAtprotoConfig, type AtprotoConfig } from './session/atproto.ts'
+import { signInWithAccount } from './network/signin.ts'
+import { linkAccount, mountAccountLinks } from './network/links.ts'
+import { addNodeAccount, withdrawNodeAccount } from './network/entries.ts'
+import { mountNetworkBoard } from './network/board.ts'
+import { personOf as requestPersonOf } from './request.ts'
 import { INSTANCE_SKIN_PATH, readInstanceSkin } from './instanceSkin.ts'
 import { assetHeaders, INSTANCE_ASSETS_PREFIX, readInstanceAsset } from './instanceAssets.ts'
 import { storeAccess } from './private/ops.ts'
@@ -193,6 +199,13 @@ export async function startServer({ repo, port, appDist, clockRefreshMs = CLOCK_
     hosted, origin: hosted && hostedConfig ? hostedConfig.origin : `http://localhost${port ? `:${port}` : ''}`,
   })
   if ('refuse' in signInRead) throw new Error(signInRead.refuse)
+  // The ReFi DAO Network's sign-in with a Bluesky or Certified account (refi-dao-os network app spec §5.1, B2): hosted,
+  // offered only with HOUSE_ATPROTO_PRIVATE_JWK (a refusal names the variable, never the value); locally, a loopback client.
+  const atprotoRead = readAtprotoConfig(process.env, {
+    hosted, origin: hosted && hostedConfig ? hostedConfig.origin : `http://localhost${port ? `:${port}` : ''}`,
+  })
+  if ('refuse' in atprotoRead) throw new Error(atprotoRead.refuse)
+  const atproto: AtprotoConfig | null = atprotoRead.config
   // The writes-off switch (Lane 3 Task 11, C1): read before anything listens; a value that is not on or off, or a hosted
   // on while a before-pilot defect is open, stops the start.
   const writesRead = givenWrites ?? readInstanceWrites(process.env, hosted)
@@ -281,7 +294,24 @@ export async function startServer({ repo, port, appDist, clockRefreshMs = CLOCK_
   const app = createApp(repo, (a, ctx) => {
     // First, so its middleware reads the session for every route mounted after it.
     writeLock = ctx.withLock
-    mountSession(a, { repo, store: privateStore, membership, hosted, config, signIn, instanceWrites })
+    mountSession(a, { repo, store: privateStore, membership, hosted, config, signIn, instanceWrites, atproto: atproto !== null })
+    if (privateStore) {
+      const personIdOf = (c: Parameters<typeof requestPersonOf>[0]) => { const p = requestPersonOf(c); return p?.kind === 'person' ? p.person.id : null }
+      mountAtproto(a, {
+        config: atproto, store: privateStore, hosted, personOf: personIdOf,
+        // B8: a round-trip may go back to the org's other sites (the network site), on the emailed link's cookie domain (I6).
+        returnDomain: signIn?.cookie.domain ?? null,
+        // B3: a proven account signs in (a linked member, or a Guest) with the shared cookie. B4: a member links theirs.
+        // B5: a node adds or withdraws its own account (no session is made or changed).
+        onIdentity: {
+          'sign-in': signInWithAccount({ store: privateStore, signIn }), link: linkAccount({ store: privateStore, personOf: personIdOf }),
+          'add-node': addNodeAccount({ store: privateStore, repo }), 'withdraw-node': withdrawNodeAccount({ store: privateStore, repo }),
+        },
+      })
+      mountAccountLinks(a, { store: privateStore, personOf: personIdOf })
+      // B6: the stewards' board of node accounts (New, Waiting) and the weekly copy's export.
+      mountNetworkBoard(a, { store: privateStore, repo })
+    }
     emailSignIn = mountEmailSignIn(a, { repo, store: privateStore, config: signIn, mailer: signInMailer, ...(config ? { hosted: config } : {}) })
     mountResources(a, store, repo, { hosted, privateStore: ctx.privateStore })
     mountOperations(a, { repo, store, jobs, executor, plans, startBranch, hosted, ...(network ? { catalogue: catalogueWith(network) } : {}) })

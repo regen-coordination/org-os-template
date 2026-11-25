@@ -5,6 +5,7 @@ import { useStatus } from '../queries.ts'
 import { isWalletSession } from '../api.ts'
 import { isSignInPath, usePortalOrigin, useSession } from '../session/session.ts'
 import { signInReturn, useEmailSignIn } from '../session/emailSignIn.ts'
+import { handleParam, useAccountStart } from '../session/accountSignIn.ts'
 
 /** Where to go once signed in: `next` when it is a path of this Hub (one leading slash, not the sign-in page), else /. */
 export function nextOf(search: string): string {
@@ -29,6 +30,8 @@ export default function SignInPage() {
   const [, navigate] = useLocation()
   const portal = usePortalOrigin()
   const email = useEmailSignIn(signInReturn(search))
+  // Coming from another of the org's sites (the network site): back there (the server judges it by I6).
+  const account = useAccountStart('sign-in', { back: signInReturn(search) })
   // Hosted only (PR7-R68): a local Hub offers email too (its links go to the server's log), but its sign-in stays the
   // wallet's, as in 0.6.
   const offered = session && !session.signedIn && session.mode === 'hosted' && session.methods && session.methods.length > 0 ? session.methods : undefined
@@ -56,7 +59,8 @@ export default function SignInPage() {
         hats={signedIn?.hats.map(h => h.name)} address={signedIn ? bareAddress(signedIn.account) : undefined}
         onSignIn={() => { void signIn() }} onCancel={cancel} portalHref={portal}
         {...(offered ? { methods: offered } : {})} onEmail={email.send} emailBusy={email.state === 'sending'} emailError={email.error}
-        sent={email.state === 'sent' ? email.sentence : null} />
+        sent={email.state === 'sent' ? email.sentence : null}
+        onAccount={account.start} accountHandle={handleParam(new URLSearchParams(search).get('handle'))} accountBusy={account.busy} accountError={account.error} />
     </main>
   )
 }

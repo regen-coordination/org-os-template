@@ -23,11 +23,18 @@ export interface SignInProps {
   portalHref?: string | null
   /** The ways offered (Lane 3, `GET /api/session`'s `methods`): with `email`, the email form is the primary and the
    *  wallet a second button, drawn only when `wallet` is offered too. Absent, the card is the wallet's alone (L5). */
-  methods?: readonly ('email' | 'wallet')[]
+  methods?: readonly ('email' | 'wallet' | 'atproto')[]
   onEmail?(email: string): void  // Email me a link
   emailBusy?: boolean            // the ask is under way
   emailError?: string | null     // the ask failed (a malformed address, the method off): the server's sentence
   sent?: string | null           // once asked: the server's sentence, shown as given, whatever it knows (I6)
+  /** With `atproto` (refi-dao-os network app B3): sign in with a Bluesky or Certified account. No handle: Certified's
+   *  sign-in; a handle: that account's own. The page leaves for it and comes back signed in. */
+  onAccount?(handle?: string): void
+  /** A Bluesky handle to fill in (back from Certified's page, ?handle=); nothing starts until a click. */
+  accountHandle?: string
+  accountBusy?: boolean
+  accountError?: string | null
 }
 
 const WAITING = 'Waiting for your wallet to sign…'
@@ -44,8 +51,9 @@ const hatCount = (n: number) => `${n} ${n === 1 ? 'hat' : 'hats'}`
  *  only: the wallet and the session are L5's, which pass the state and the two callbacks. When the state changes
  *  after the first draw, focus goes to the new state's action (the body, when it has none) and the new state is said
  *  once through the page's polite region; a failure is said by its own note. */
-export function SignIn({ org, state, hats = [], address, tree, error, onSignIn, onCancel, portalHref = null, methods = ['wallet'], onEmail, emailBusy = false, emailError = null, sent = null }: SignInProps) {
+export function SignIn({ org, state, hats = [], address, tree, error, onSignIn, onCancel, portalHref = null, methods = ['wallet'], onEmail, emailBusy = false, emailError = null, sent = null, onAccount, accountHandle = '', accountBusy = false, accountError = null }: SignInProps) {
   const byEmail = methods.includes('email')
+  const byAccount = methods.includes('atproto') && onAccount !== undefined
   const byWallet = methods.includes('wallet')
   const titleId = useId()
   const body = useRef<HTMLDivElement>(null)
@@ -77,6 +85,8 @@ export function SignIn({ org, state, hats = [], address, tree, error, onSignIn, 
         {!sent && byEmail && state === 'idle' && <>
           <EmailForm onEmail={onEmail} busy={emailBusy} />
           {emailError && <Note state="error">{emailError}</Note>}
+          {byAccount && <AccountForm onAccount={onAccount!} busy={accountBusy} initial={accountHandle} />}
+          {byAccount && accountError && <Note state="error">{accountError}</Note>}
           {byWallet && <div className="signin-go"><Button onClick={onSignIn}>Sign in with a wallet</Button></div>}
         </>}
         {!sent && !byEmail && state === 'idle' && <>
@@ -107,6 +117,28 @@ export function SignIn({ org, state, hats = [], address, tree, error, onSignIn, 
           <div className="signin-go"><Button onClick={onSignIn}>Try again</Button></div>
         </>}
       </div>
+    </div>
+  )
+}
+
+/** A Bluesky or Certified account (network app B3): the one button, which starts at Certified's sign-in, and a labelled
+ *  field for a Bluesky handle. Pages say "Bluesky or Certified", never the protocol's name. */
+function AccountForm({ onAccount, busy, initial }: { onAccount: (handle?: string) => void; busy: boolean; initial: string }) {
+  const id = useId()
+  const [handle, setHandle] = useState(initial)
+  const submit = (e: FormEvent) => {
+    e.preventDefault()
+    if (!busy && handle.trim() !== '') onAccount(handle)
+  }
+  return (
+    <div className="signin-form">
+      <div className="signin-go"><Button onClick={() => { if (!busy) onAccount() }} {...(busy ? { busy: 'Opening…' } : {})}>Sign in with Bluesky or Certified</Button></div>
+      <form onSubmit={submit}>
+        <label className="signin-label" htmlFor={id}>Or a Bluesky handle</label>
+        <input className="input" id={id} name="handle" autoComplete="username" placeholder="you.bsky.social"
+          value={handle} onChange={e => setHandle(e.target.value)} />
+        <div className="signin-go"><Button type="submit">Continue with this handle</Button></div>
+      </form>
     </div>
   )
 }
