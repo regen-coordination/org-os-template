@@ -8,6 +8,75 @@ For the policy that governs what counts as a version bump, see [`docs/VERSIONING
 
 _(Append changes here as they land.)_
 
+## [0.7.4] — 2026-11-25
+
+**0.7.4 releases what merged after 0.7.3: federation on atproto (N0–N2), `org-os-kms` 0.2.0 with the needs/offers pack,
+and a `vault:snapshot` that captures untracked files.** All of it is additive. Nothing is published by updating: every
+atproto write needs an account in `kms.yaml`, an app password in the server env and an operator's confirmation, and the
+network's record types use a placeholder authority, refused on a live account, until the network has its own domain.
+
+### Added
+
+- **Federation on atproto, N0–N2** (`packages/admin`, #32). An instance knows its peers, opens other instances from a
+  launcher, and joins a network:
+  - A node asks to join (`POST /api/federation/ask`, by file or GitHub issue). The hub refuses, accepts under a
+    decision, or proposes, under its join policy; an accepted join carries the `Org-Rule: federation/join` trailer.
+  - Each side publishes its half of a public membership link to its own PDS (`memberOf`, `hasMember`). The link's state
+    (mutual, claimed, requested, left, not-an-instance, unknown) is read from both repositories, never stored.
+  - `federation-requests` and `invites` are never widened past members. An invite token is stored as its sha256 only.
+    A DID enters `federation.yaml` only through the migration list, bound on both sides.
+  - Every atproto write is planned on the trunk and confirmed; a delete goes through only if the record is unchanged,
+    and withdrawing two or more records at once is refused.
+  - The 9 federation write routes are instance writes and are **off on a hosted Hub** (403) until hosted federation has
+    its own review. The receive, decide and invites routes honour the 0.7.3 `files:` section.
+  - New pages: Federation and the launcher. New docs: `docs/OPENING.md`, `docs/FEDERATION.md` § Joining a network.
+- **`org-os-kms` 0.2.0** (#31). Every new key is off or absent by default:
+  - A read-only Hypercerts connector, scoped by `follows_of` and `dids` (it refuses to run unscoped), with an optional
+    Constellation backlink lookup (`constellation.enabled`).
+  - The `org-os-needs-offers` pack: `need` and `offer` types with a required `visibility` level, published in a shared
+    lexicon. The shipped lexicons (`example.commons.need|offer`) are placeholders, and `apply` refuses them.
+  - A matching-only floor in core: a need or offer that is not `visibility: public` never reaches a public output, and
+    references to non-public objects are scrubbed by value from every one.
+  - Claims for a node: published in the instance's own account only with a by-name consent date from the node, cut to
+    an allow-list, and superseded by the node's own record.
+  - Certified update drafts, written as a file for the node's own session to post. The bundle never holds a node's
+    credentials.
+
+### Changed
+
+- **`networkFetch` is https-only and public-only** (#32): an `ORG_OS_RPC` that resolves to a private address is refused.
+- **`validate-identity` warns** about a `networks` block nested under `federation:` and asks to move it to the top level.
+  It fails only under `--strict`.
+- **The framework's OpenCode agents are generic** (#34). The four `.opencode/agents/*` files described one operator's
+  notes vault and are removed; `.agents/agents/operator.md` and `upstream.md` no longer name a path on disk;
+  `clone-excludes` keeps `.opencode/agents` out of new instances.
+- **The dashboard's lifecycles are declared once** (`scripts/lib/lifecycles.mjs`, #34). A closed opportunity is no longer
+  listed as upcoming, the projects bar counts the stages the data uses, values outside a lifecycle are shown instead of
+  dropped, and QUEUE items with a `Plan:` link are parsed.
+
+### Fixed
+
+- **`vault:snapshot` captures untracked files** (#33). It called `git stash create -u`, but `stash create` takes no
+  options, so a snapshot held the tracked tree only: the untracked notes it exists to protect were never in it. It now
+  builds the snapshot from a temporary index of tracked and untracked files (gitignored files stay out), without touching
+  the working tree, the index or the stash list. `doctor sync` takes its pre-sync snapshot the same way, and
+  `docs/VAULT-SAFETY.md` says what a snapshot captures. **Snapshots made before 0.7.4 hold the tracked tree only.**
+- **The kms copy of the house tokens** lacked `--w-sites`; it is regenerated, and `house-tokens.test.mjs` passes (#34).
+
+### Upgrading
+
+- An instance that keeps its own copy of `scripts/vault-snapshot.mjs` should take this release's copy; until then its
+  snapshots miss untracked files.
+- Members joined before N2 need a `link: hasMember` before their hub can publish them.
+
+### Known, not changed
+
+- `docs/OPENING.md` describes `npm run open`, which a bare clone without `packages/admin` does not have.
+- Whether an `open` acceptance should wait for both sides' files before publishing `hasMember`, and a "withdraw all"
+  override for the mass-delete guard, are open for the operator.
+- The needs/offers lexicons and the network's record authority are placeholders. What the kms scrub does not catch is
+  listed in `packages/org-os-kms/docs/CONNECTORS.md`.
+
 ## [0.7.3] — 2026-11-23
 
 **0.7.3 closes what 0.7.2's `files:` section still let a member be told of a file kept from them.** It comes from a
