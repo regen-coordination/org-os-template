@@ -8,6 +8,64 @@ For the policy that governs what counts as a version bump, see [`docs/VERSIONING
 
 _(Append changes here as they land.)_
 
+## [0.7.5] — 2026-11-25
+
+**0.7.5 releases sign-in with a Bluesky or Certified account, and a network's node accounts (#36).** #36 merged just
+before 0.7.4's release commit, so 0.7.4's code already carries it; 0.7.5 is the release that names it and says how to
+take it. It is off on a hosted Hub until the operator sets its key, and nothing is ever written to anyone's account:
+the sign-in asks for identity only (scope `atproto`). **The private store moves to schema 4 on first start: back it up
+first** (*Upgrading*).
+
+### Added
+
+- **Sign in with a Bluesky or Certified account** (`packages/admin`, #36), beside the emailed link. An AT Proto OAuth
+  round-trip, identity only, that ends in the same shared session cookie the emailed link issues:
+  - Hosted, a confidential client (`HOUSE_ATPROTO_PRIVATE_JWK`, ES256), whose id is
+    `https://<hub>/oauth/client-metadata.json`; locally on http, a loopback client.
+  - Every round-trip starts by a click on a Hub page (`POST /api/session/atproto/start`, JSON); there is no GET start.
+    A typed handle must be a handle, never an address. The callback checks the flow cookie of the browser that started
+    it, and no token is kept after it.
+  - A linked account signs in as its person, with their Roles. Anyone else comes in as a **Guest**: `sub guest:<did>`,
+    `roles: []`, kept in its own table, which a Roles load never touches.
+  - A member links or unlinks their own account (`/account-links`).
+  - Certified's sign-in page can carry the Hub's colour (`HOUSE_ATPROTO_BRAND_COLOR`, `#rrggbb`) and its "Sign in with
+    Atmosphere" button. A handle typed there comes to `/sign-in/atmosphere`, which only fills it in on the page the
+    round-trip started from.
+- **A network's node accounts** (#36). For an instance whose `data/kb/organization.yaml` lists local nodes:
+  - A node adds or withdraws its own account by signing in with it (`/network-account`). It goes live at once when the
+    account matches the node (a handle on the node's own website host, or one its record names), and otherwise waits
+    for a steward. A person's linked account is never a node's, and an account holds one node.
+  - Stewards see New (Remove) and Waiting (Confirm, Decline) at `/network-accounts`, and read the export
+    (`GET /api/network/export`). A steward's removal sticks: the same account is then held for a steward.
+  - Two public reads: `GET /api/network` (node, DID, handle, apps; nodes removed in the last 14 days) and
+    `GET /api/network/nodes/:id`.
+- **`/sign-out`**: ends the session and goes back to another of the org's sites (judged by the I6 return rule).
+
+### Changed
+
+- `issueSession` is the one issuing path, for the emailed link too.
+- `DELETE /api/session?return=` answers the judged next address; without `return` it still answers 204.
+- `readPersonCookie` reads a Guest's cookie, which is not re-issued (it ends after 24 hours).
+- New writes are named in `INSTANCE_WRITES` / `HOSTED_WRITES`; the stewards' board writes only to the private store, so
+  it works while `HOUSE_INSTANCE_WRITES=off`.
+- New dependency: `@atproto/oauth-client-node` 0.5.21 (exact).
+
+### Upgrading
+
+- **Back up the private store before 0.7.5 first starts.** It moves to schema 4 (five new tables; every existing row is
+  kept). An older org-os refuses a schema-4 store, so rolling back past 0.7.5 means restoring that backup.
+- To offer the sign-in on a hosted Hub, set `HOUSE_ATPROTO_PRIVATE_JWK` (`deploy/hub/env.example`). Without it the
+  routes answer 404 "not offered". The client's id is tied to the Hub's address: set it on the address the Hub keeps.
+- The org's other sites read a Guest's cookie as no member. The v2.5 Hub, the Ideas site and the Commons have tests
+  for this in their own repositories.
+
+### Known, not changed
+
+- A sign-in that fails partway can leave its OAuth session rows in the store; two tabs signing in at once spoil each
+  other's round-trip; a local Hub opened at `localhost` (not `127.0.0.1`) may fail the loopback sign-in.
+- A double click can file the same pending claim twice; Confirm says nothing when a node's record lists no channel.
+- The granted scope is not checked against `atproto` after the callback.
+
 ## [0.7.4] — 2026-11-25
 
 **0.7.4 releases what merged after 0.7.3: federation on atproto (N0–N2), `org-os-kms` 0.2.0 with the needs/offers pack,
