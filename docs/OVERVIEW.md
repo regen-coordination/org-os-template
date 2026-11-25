@@ -42,12 +42,13 @@ An agent reads these at the start of a session. `AGENTS.md` lists the ten-step s
 - `DECISIONS.md` is the authoritative record of what was decided and why.
 - `HEARTBEAT.md` is the live list of active tasks and health checks.
 - `memory/YYYY-MM-DD.md` are daily logs, appended to and never overwritten. A new instance starts with an empty `memory/` (a `.gitkeep`); the framework's own logs and its `memory/reports/` stay in the framework repository.
+- Since 0.7, memory only the Council may read is not written to git: `npm run memory -- add --level <hat or role>` posts it to the running Hub, which keeps it in its private store (see below). `/close` asks of each entry whether it is for members or for the Council.
 
 Plans: the framework repository keeps its own in the `agent-plans` directory under `docs/`, with its `QUEUE.md` there. A new instance gets `docs/plans/` (queue: `docs/plans/QUEUE.md`) and `docs/superpowers/{specs,plans,research}/`, empty. Documented in [File structure](FILE-STRUCTURE.md) and [Plans](PLANS.md).
 
 ### Data registries: `data/`
 
-YAML files are the source of truth for structured facts: members, projects, finances, governance, meetings, ideas, funding opportunities, relationships, sources, events, channels, assets and more. Each file has a top-level key matching its name and an `id` on every entry. The framework repository's own `data/` has 18 files. A new instance does not get `instances.yaml`, `skills-matrix.yaml` or `packages-matrix.yaml` (framework-only), starts with `members`, `projects`, `ideas`, `relationships`, `ecosystems` and `governance` reset to empty scaffolds, and has the framework's `data/federation/frontier` cache removed. Since 0.6, `data/governance.yaml` can also hold the org's rules (who may propose and who decides each class of change; with none, the maintainer decides alone), and an instance may add `systems`, `boards`, `proposals`, `library` and `visibility` registries, which the [admin app](ADMIN-APP.md) reads and writes. After editing:
+YAML files are the source of truth for structured facts: members, projects, finances, governance, meetings, ideas, funding opportunities, relationships, sources, events, channels, assets and more. Each file has a top-level key matching its name and an `id` on every entry. The framework repository's own `data/` has 18 files. A new instance does not get `instances.yaml`, `skills-matrix.yaml` or `packages-matrix.yaml` (framework-only), starts with `members`, `projects`, `ideas`, `relationships`, `ecosystems` and `governance` reset to empty scaffolds, and has the framework's `data/federation/frontier` cache removed. Since 0.6, `data/governance.yaml` can also hold the org's rules (who may propose and who decides each class of change; with none, the maintainer decides alone), and an instance may add `systems`, `boards`, `proposals`, `library` and `visibility` registries, which the [admin app](ADMIN-APP.md) reads and writes. 0.7 adds `tasks`, `collections` (with each collection's records in `data/collections/<id>.yaml`), `imports`, and, for a hub, `federation-requests` and `invites`; the workspace's pages are Markdown files in `pages/`. After editing:
 
 ```bash
 npm run generate:schemas && npm run validate:schemas
@@ -57,11 +58,11 @@ Documented in [Data model](DATA-MODEL.md). `npm run validate:data` and `npm run 
 
 ### Generated descriptors: `.well-known/` and `schemas/`
 
-`npm run generate:schemas` writes from the registries into `.well-known/`: `dao.json`, members, proposals, activities, contracts and a `governance.md` (EIP-4824), grant pools, applications and attestation issuers when there are any (DAOIP-5, DAOIP-3), and meetings, projects, finances, ideas and knowledge. It writes only what `data/visibility.yaml` makes public, and nothing until `identity.daoURI` is set in `federation.yaml`. `skills.json` comes from `npm run generate:skills`. A new instance ships the `.json.template` files, a `dao.json` the clone renders from its config, and a copy of the generator in `scripts/lib/standards/`. The files are never edited by hand. `schemas/` holds the JSON-LD and JSON Schema definitions the generators and validators use, and the change classes the rules are written against (`schemas/change-classes.json`). Documented in [EIP-4824 guide](EIP4824-GUIDE.md) and [Data model](DATA-MODEL.md).
+`npm run generate:schemas` writes from the registries into `.well-known/`: `dao.json`, members, proposals, activities, contracts and a `governance.md` (EIP-4824), grant pools, applications and attestation issuers when there are any (DAOIP-5, DAOIP-3), and meetings, projects, finances, ideas, knowledge and federation. It writes only what `data/visibility.yaml` makes public, and nothing until `identity.daoURI` is set in `federation.yaml`. `skills.json` comes from `npm run generate:skills`. A new instance ships the `.json.template` files, a `dao.json` the clone renders from its config, and a copy of the generator in `scripts/lib/standards/`. The files are never edited by hand. `schemas/` holds the JSON-LD and JSON Schema definitions the generators and validators use, and the change classes the rules are written against (`schemas/change-classes.json`). Documented in [EIP-4824 guide](EIP4824-GUIDE.md) and [Data model](DATA-MODEL.md).
 
 ### Federation: `federation.yaml`
 
-Declares the instance's identity and network, its `peers`, its `upstream` and `downstream` instances, and a trust level per peer (`full`, `read` or `none`). It is opt-in: an instance with no peers is a complete instance. Documented in [Federation](FEDERATION.md).
+Declares the instance's identity and network, its `peers`, its `upstream` and `downstream` instances, and a trust level per peer (`full`, `read`, `read-write` or `none`; stored and shown, not enforced). It is opt-in: an instance with no peers is a complete instance. Since 0.7.4 an instance can ask to join a hub's network from the Hub's Federation page, and each side can publish its half of the link as a record in its own atproto account; that has not yet been run on live accounts. Documented in [Federation](FEDERATION.md).
 
 ### Skills: `skills/`
 
@@ -78,6 +79,15 @@ Each skill is a directory with a `SKILL.md` (the cross-vendor Agent Skills forma
 | `dashboard.yaml` | Which sections `/initialize` shows, and in what order | [File structure](FILE-STRUCTURE.md) |
 | `templates/` | What the cloning engine renders a new instance from | [Setup](SETUP.md) |
 
+## The Hub: `packages/admin`
+
+The Hub is a web app for an instance: its records, the rules that decide changes, proposals, boards, outside systems (a Safe, a Hats tree, a Snapshot space) and, since 0.7, the workspace (pages, collections and their views, tasks, comments). A change to the instance's files is a git commit; anything stricter than members is kept in a private store outside the repository (`.org-os/private/` by default), with its own encrypted backups. `data/visibility.yaml` says what is public.
+
+- **On your own machine.** Run it from the framework checkout, against an instance (`npm run admin -- --repo ../my-instance`, on `http://localhost:4680`), or start the launcher (`npm run open`), which opens, creates or adopts an instance and starts its Hub. Whoever is at the machine acts as the member whose `handles.git` matches `git config user.email`. See [Opening an instance](OPENING.md).
+- **Hosted, for members.** One container image (`deploy/hub/`). Members sign in by an emailed link, with a Bluesky or Certified account (0.7.5, once the operator sets its key), or with a wallet when the org names a Hats tree; their Roles decide what they read. A hosted Hub writes nothing to its instance by default (`HOUSE_INSTANCE_WRITES=off`): it reads the instance and follows its remote, fast-forward only. Comments and per-member state still work. See [Setup](SETUP.md#host-a-hub).
+
+An instance does not receive `packages/admin`; the Hub runs from the framework checkout or from the image. Documented in [Admin app](ADMIN-APP.md) and `packages/admin/README.md`.
+
 ## What you run
 
 ```bash
@@ -87,7 +97,8 @@ npm run generate:schemas    # registries -> .well-known/
 npm run validate:schemas    # schema and identity checks
 npm run validate:structure  # file and folder structure
 npm run doctor -- --dir ../my-instance   # read-only assessment, from the framework checkout (an instance does not carry the doctor)
-npm run admin -- --repo ../my-instance   # the admin app on http://localhost:4680, from the framework checkout
+npm run admin -- --repo ../my-instance   # the Hub on http://localhost:4680, from the framework checkout
+npm run open                # the launcher on http://localhost:4679/launch: open, create or adopt an instance
 npm run vault:snapshot -- "reason"   # permanent ref for tracked and untracked files before a risky git operation
 ```
 
@@ -97,6 +108,7 @@ In an agent host, `/initialize` opens a session and `/close` ends it (memory wri
 
 - Start an instance: [Setup](SETUP.md), or [Adopt with an agent](ADOPT-WITH-AN-AGENT.md).
 - Run one day to day: [Operator guide](OPERATOR-GUIDE.md).
+- Run the Hub: [Admin app](ADMIN-APP.md), [Opening an instance](OPENING.md).
 - Connect it to other instances: [Federation](FEDERATION.md).
 - Guard against losing files: [Vault safety](VAULT-SAFETY.md).
 - Keep and publish knowledge: [The knowledge management system](KMS.md).
