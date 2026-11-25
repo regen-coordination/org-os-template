@@ -93,28 +93,34 @@ The bundle is a committed build output. If you change the component, run `npm ru
 
 ## The `<federation-map>` element
 
+`@org-os/federation-map` 0.2.0 (on main since org-os 0.7.0) draws the map as the "house map": layered by the direction knowledge travels, static first, keyboard-complete, with a list twin. It has no dependencies; the d3-force rings of earlier versions are gone.
+
 ```html
-<script type="module">import "./packages/org-os-federation-map/src/index.mjs";</script>
-<federation-map src="/map.json"></federation-map>                 <!-- fetch -->
-<federation-map mode="mini">                                      <!-- inline -->
-  <script type="application/json">{ "self": {...}, "nodes": [...], "edges": [...] }</script>
-</federation-map>
+<script src="packages/org-os-federation-map/dist/federation-map.iife.js"></script>
+<federation-map src="/map.json"></federation-map>                                   <!-- fetch -->
+<federation-map data-surface="vault"><script type="application/json">{…}</script></federation-map>
+<federation-map mode="mini" href="/federation"><script type="application/json">{…}</script></federation-map>
 ```
 
-The import path above is relative to the page; adjust it to where the package sits. The package README writes the bare specifier `@org-os/federation-map`, which works only if the package is installed under that name; nothing in this repository shows it published to a registry (not verified). Without a bundler, load the committed standalone bundle `packages/org-os-federation-map/dist/federation-map.iife.js` with a plain `<script src>` instead.
-
-Attributes:
+Without a bundler, load the committed bundle with a plain `<script src>`. Importing `src/index.mjs` directly needs a bundler; the project site does that through Vite. The package README writes the bare specifier `@org-os/federation-map`, which works only if the package is installed under that name; nothing in this repository shows it published to a registry.
 
 | Attribute | Values | Effect |
 |---|---|---|
 | `src` | URL of a `map.json` | fetched when the element connects |
-| `mode` | `full` (default), `mini` | `mini` has no pan, zoom, drag, click panel or tooltip, and shows labels only for the centre and ring-1 instances. Meant for a small preview. |
+| inline `<script type="application/json">` child | the map data | wins over `src` |
+| `mode` | `full` (default), `mini` | `mini` draws the small map: this instance and up to six neighbours, 188px tall, the whole element one link |
+| `href` | a URL, default `#` | where the `mini` map links |
+| `data-surface` | `vault`, or absent | `vault` is the steward's copy (attention marks, vault links); without it you get the public copy, where peers not reached read "not mapped" |
 
-An inline `<script type="application/json">` child wins over `src`. Bad or missing data (not JSON, no `self.id`, no `nodes` array, a fetch error) renders a quiet empty state, `No federation data - run org-os-kms render map`, and never throws. Nodes without `id` or `kind`, and edges whose ends are not both known, are dropped.
+**The layout** (`src/layout.mjs`) is pure and has no imports. From top to bottom: one hop beyond, over the upstream instance that reported it; what feeds this instance (upstream instances and sources, an ecosystem's sources grouped); the centre row (this instance, its federation peers on one side, its knowledge peers on the other, and their one-hop-beyond nodes further out); downstream instances; and one hop beyond below them. Inputs are sorted first, so the same `map.json` always gives the same picture, and positions are computed, never stored. Names and facts wrap; they are never cut.
 
-Behaviour in `full` mode: the layout is a d3-force simulation with the rings pinned as orbits (radii 0.28, 0.42 and 0.55 of the smaller side of a 900 by 640 canvas), a fixed random seed and hashed starting angles, so the same data gives the same picture. Hovering a node lights it and its neighbours and dims the rest; clicking opens a side panel with the node's fields and its links (`visit`, `repository`, `federation.json` for instances with a `url`, and `portal`); dragging a node moves it; the wheel zooms; dragging the background pans; the centre node is fixed. `#node=<id>` in the page address lights and centres that node on load. Frontier nodes are faint embers with labels shown only when lit. Links in the panel are limited to `http(s):` and `obsidian:` addresses or same-page paths, and every value is escaped, because node fields can come from a remote peer's manifest. A visually hidden table lists nodes for screen readers, and the ember animation stops under `prefers-reduced-motion`.
+**Behaviour.** The element draws the static map (`src/static.mjs`, the same HTML kms pre-draws so its pages work without JavaScript) into its shadow root at its own width, then adds selection, keys, the List · Map toggle, Fit, zoom and the `#node=<id>` deep link. Tab enters at this instance or the deep-link target; arrow keys move along edges; Enter opens the node's first safe link (`safeUrl` allow-lists link schemes); Space fills the caption; Esc leaves the map; `v` toggles List · Map; ⌘0 fits, and ⌘+ / ⌘− (or ctrl-wheel) zoom between 50 and 200 %. A button outside the element with `data-fm-view="list"` or `"map"`, or `data-fm-fit`, drives the map its `aria-controls` names (with none, the page's first map), and the element keeps its `aria-pressed` in step. Data that cannot be read (not JSON, a failed fetch, no nodes) shows "No federation data yet. Run `org-os-kms render map`." and never throws; a page kms pre-drew keeps its drawing instead.
 
-Theme with custom properties on the element or an ancestor: `--fedmap-bg`, `--fedmap-self`, `--fedmap-instance`, `--fedmap-source`, `--fedmap-ember`, `--fedmap-text`, and `--fedmap-font`. The package exports `FederationMap`, `define`, `normalizeMap`, `buildLayout`, `RING_RADIUS`, `nodeRadius`, `renderSVG` and `esc`; importing it registers the element.
+**Theme.** The element reads the house tokens from the page (`--paper`, `--edge`, …); when the page has none it uses the house values in `src/house-tokens.mjs`, generated from kms's `house-tokens.css` by `scripts/sync-tokens.mjs`. Light and dark follow the reader's setting. For one release the old `--fedmap-bg`, `--fedmap-text` and `--fedmap-font` are still read, as aliases of `--sunken`, `--ink` and `--sans`.
+
+**Exports** (`src/index.mjs`; importing it registers the element): `FederationMap`, `MapController`, `define`, `nodePanelHTML`, `safeUrl`, `normalizeMap`, `layoutMap`, `nearestInDirection`, `LAYOUT`, `EDGE_WORDS`, `nodeView`, `statusLine`, `captionSentence`, `renderStaticMap`, `renderListTwin`, `renderSmallMap`, `renderCaption`, `esc`, `ICONS_USED`, `MAP_ICONS`, `mapSprite` and `HOUSE_TOKENS_CSS`.
+
+**Building.** `npm run build` inside the package (esbuild, its only dev dependency) writes `dist/federation-map.iife.js` with `map.css` bundled as text. The bundle is committed; `test/dist.test.mjs` checks it exists, is self-contained and carries no d3.
 
 ## How the project site uses it
 
