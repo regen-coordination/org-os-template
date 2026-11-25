@@ -1,6 +1,6 @@
 // A fresh checkout builds, or says in one sentence which install is missing and
-// the command that fixes it. The site needs three installs (the repository root,
-// the federation map package, the site itself); with one missing the build used
+// the command that fixes it. The site needs two installs (the repository root and
+// the site itself); with one missing the build used
 // to stop on a Node stack trace naming a file in another package.
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -26,19 +26,19 @@ function fakeRepo(installed) {
   return root;
 }
 
-test("the three installs are listed in the order CI runs them", () => {
-  assert.deepEqual(REQUIRED_INSTALLS.map((i) => i.dir), [".", "packages/org-os-federation-map", "site"]);
+test("the two installs are listed in the order CI runs them", () => {
+  assert.deepEqual(REQUIRED_INSTALLS.map((i) => i.dir), [".", "site"]);
 });
 
-test("with nothing installed, all three are reported, in order", () => {
+test("with nothing installed, both are reported, in order", () => {
   const root = fakeRepo([]);
   try {
-    assert.deepEqual(missingInstalls(root).map((i) => i.dir), [".", "packages/org-os-federation-map", "site"]);
+    assert.deepEqual(missingInstalls(root).map((i) => i.dir), [".", "site"]);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-test("with only the federation map and the site installed, the root install is reported", () => {
-  const root = fakeRepo(["packages/org-os-federation-map", "site"]);
+test("with only the site installed, the root install is reported", () => {
+  const root = fakeRepo(["site"]);
   try {
     const missing = missingInstalls(root);
     assert.deepEqual(missing.map((i) => i.dir), ["."]);
@@ -49,8 +49,8 @@ test("with only the federation map and the site installed, the root install is r
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-test("with all three installed, nothing is reported", () => {
-  const root = fakeRepo([".", "packages/org-os-federation-map", "site"]);
+test("with both installed, nothing is reported", () => {
+  const root = fakeRepo([".", "site"]);
   try {
     assert.deepEqual(missingInstalls(root), []);
   } finally { rmSync(root, { recursive: true, force: true }); }
@@ -80,7 +80,7 @@ test("run without any install, the aggregator says what is missing and prints no
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-test("site/README.md names the three installs in the order CI runs them", () => {
+test("site/README.md names the two installs in the order CI runs them", () => {
   const lines = readFileSync(join(SITE, "README.md"), "utf8").split("\n");
   const positions = REQUIRED_INSTALLS.map((i) => lines.findIndex((line) => line.startsWith(i.readme)));
   for (const [n, at] of positions.entries()) {
@@ -89,7 +89,7 @@ test("site/README.md names the three installs in the order CI runs them", () => 
   assert.deepEqual(positions, [...positions].sort((a, b) => a - b), "the installs are out of order in site/README.md");
 });
 
-test("the deploy workflow installs the same three, in the same order", () => {
+test("the deploy workflow installs the same two, in the same order", () => {
   const workflow = readFileSync(join(REPO, ".github", "workflows", "deploy-pages.yml"), "utf8");
   const steps = workflow.split(/\n\s+- name: /).filter((s) => /\n\s+run: npm ci\b/.test(s));
   const dirs = steps.map((s) => s.match(/working-directory: (\S+)/)?.[1] ?? ".");

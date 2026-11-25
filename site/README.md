@@ -4,12 +4,11 @@ The org-os framework website + docs + live federation — one static Astro site.
 
 ## Run
 
-The site needs three installs, in this order (the order CI runs them). Each
+The site needs two installs, in this order (the order CI runs them). Each
 installs from its lockfile; `--ignore-scripts` may be added to any of them.
 
 ```bash
 (cd .. && npm ci)                                   # the repository root: packages/org-os-kms loads js-yaml from here
-(cd ../packages/org-os-federation-map && npm ci)    # d3-force, for the <federation-map> element
 npm ci                                              # the site itself
 ```
 
