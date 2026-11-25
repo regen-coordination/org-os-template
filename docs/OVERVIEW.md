@@ -88,7 +88,7 @@ npm run validate:schemas    # schema and identity checks
 npm run validate:structure  # file and folder structure
 npm run doctor -- --dir ../my-instance   # read-only assessment, from the framework checkout (an instance does not carry the doctor)
 npm run admin -- --repo ../my-instance   # the admin app on http://localhost:4680, from the framework checkout
-npm run vault:snapshot -- "reason"   # permanent ref for tracked files before a risky git operation (not untracked files)
+npm run vault:snapshot -- "reason"   # permanent ref for tracked and untracked files before a risky git operation
 ```
 
 In an agent host, `/initialize` opens a session and `/close` ends it (memory written, heartbeat updated, commit). Hosts and slash commands are covered in [Commands](COMMANDS.md) and [Host integration](HOST-INTEGRATION.md).

@@ -119,7 +119,7 @@ These are in `package.json` but cannot work today. Do not rely on them.
 ## Tips
 
 - Commit messages: say what changed and why ("Add new team members and update meeting notes"), not "Update files".
-- Before anything that rewrites many files, protect untracked notes (commit or copy them aside), run `npm run vault:snapshot` (tracked files only), then `npm run vault:audit` afterwards.
+- Before anything that rewrites many files, run `npm run vault:snapshot` (tracked and untracked files since 0.7.4; not gitignored ones), then `npm run vault:audit` afterwards.
 - Never `git stash`, `git clean` or `git reset --hard` in a workspace that holds untracked notes; the agent settings deny them.
 
 ## See also

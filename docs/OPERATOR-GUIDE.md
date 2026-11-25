@@ -67,7 +67,7 @@ npm run doctor -- --dir ../my-instance
 npm run validate:data -- ../my-instance
 npm run validate:governance -- ../my-instance
 
-# Pin tracked files before anything risky (tracked files only; protect untracked notes first)
+# Pin the working tree before anything risky (tracked and untracked files; not gitignored ones)
 npm run vault:snapshot -- "before <reason>"
 ```
 

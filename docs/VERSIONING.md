@@ -185,7 +185,7 @@ gh run list --workflow=validate.yml --limit 1   # and a GREEN CI run on this com
 gh workflow disable drift.yml
 gh workflow disable generate-schemas.yml
 
-# 4. Snapshot (tracked files only; protect untracked notes first), then bump. version:update rewrites the five version surfaces and
+# 4. Snapshot, then bump. version:update rewrites the five version surfaces and
 #    promotes [Unreleased] → [<version>] — <date> with comparison links.
 npm run vault:snapshot -- "v0.6.1 release point"
 npm run version:update 0.6.1
