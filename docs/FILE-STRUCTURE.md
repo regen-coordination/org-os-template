@@ -157,7 +157,7 @@ The admin app (the Hub, `packages/admin`, run from the framework against an inst
 | `house/` | The instance's own look, all optional: `skin.css`, `themes.yaml` and `themes.css`, `bar.yaml`, `nav.yaml` and its images (0.7.1). The Hub reads them; it does not commit them. |
 | `.org-os/private/` | The private store: what is stricter than members, and the sessions. The copied `.gitignore` names it, and the Hub refuses to open a store inside the repository that git does not ignore. Never committed. |
 
-The Hub commits only under `data/`, `pages/`, `memory/`, `docs/plans/`, `docs/agent-plans/` and `federation/outgoing/`, and to `IDENTITY.md`, `federation.yaml`, `MEMORY.md`, `HEARTBEAT.md` and (in a ratify) `DECISIONS.md` (`assertWritablePath` in `packages/admin/server/git.ts`). See [ADMIN-APP.md](ADMIN-APP.md).
+The Hub commits only under `data/`, `pages/`, `memory/`, the plans folders (`docs/plans/`, and in the framework its `agent-plans` directory under `docs/`) and `federation/outgoing/`, and to `IDENTITY.md`, `federation.yaml`, `MEMORY.md`, `HEARTBEAT.md` and (in a ratify) `DECISIONS.md` (`assertWritablePath` in `packages/admin/server/git.ts`). See [ADMIN-APP.md](ADMIN-APP.md).
 
 ### Tool configuration directories
 
