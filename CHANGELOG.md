@@ -6,11 +6,21 @@ For the policy that governs what counts as a version bump, see [`docs/VERSIONING
 
 ## [Unreleased]
 
+_(Append changes here as they land.)_
+
+## [0.7.6] — 2026-11-26
+
+**0.7.6 is the docs read against 0.7, and one fix in `org-os-kms publish`.** The public site now publishes the v2
+docs with the newcomer and reference pages rewritten for 0.7 (the Hub, sign-in, hosting, the private store, federation
+on atproto, kms 0.2.0). `org-os-kms publish` now runs the canon gate in an instance with no plane role whose knowledge
+base holds canon control data, so a `draft` there is no longer published. No store or data migration; nothing to do on
+upgrade unless such an instance relied on drafts going out (*Upgrading*).
+
 ### Added
 
 - **The site's docs, v2.** The public site publishes the 46 pages listed in
-  `site/src/data/docs-manifest.mjs`, each stamped with the commit it was last read against; every page
-  was read against the 0.6 code for this release. `npm run drift` in `site/` names a page whose covered
+  `site/src/data/docs-manifest.mjs`, each stamped with the commit it was last read against. The newcomer
+  and reference pages were re-read against 0.7.5 for this release; the stamps say which commit each page stands on. `npm run drift` in `site/` names a page whose covered
   code has changed since. Tables scroll in a named region a keyboard reaches, no page scrolls sideways at
   375 or 320px (`npm run widths`), and a doc search index covers every page.
 
@@ -43,6 +53,16 @@ For the policy that governs what counts as a version bump, see [`docs/VERSIONING
   unchanged.
 - **`npm run drift` in `site/` prints its whole report into a pipe.** `process.exit` cut it at the first
   64 KB.
+- **`npm run verify` in `site/` prints its whole report into a pipe too.** Its output is written blocking, so
+  a run that ends early no longer loses the lines a pipe had not yet taken (a site test read them and failed
+  on a slow runner).
+
+### Upgrading
+
+- Nothing to migrate. An instance with no `planes` key in `kms.yaml` whose knowledge base holds a source card that
+  claims or holds corpus paths, or a `public-use-boundary` record, now has the canon gate applied by `publish`: entries
+  it published before as `maturity: draft` stay back, and malformed cards or boundaries refuse the publish
+  (`refused: 'canon-control-data'`). Run `org-os-kms publish --dry` to see what changes before applying.
 
 ## [0.7.5] — 2026-11-25
 
@@ -937,7 +957,13 @@ Incubation. See git history for granular changes. Notable milestones:
 - `a2feec4` — egregore, koi, opal integrations landed.
 - `12ef2f9` — 4 Regen agents + knowledge initiation plan.
 
-[Unreleased]: https://github.com/regen-coordination/org-os-template/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/regen-coordination/org-os-template/compare/v0.7.6...HEAD
+[0.7.6]: https://github.com/regen-coordination/org-os-template/compare/v0.7.5...v0.7.6
+[0.7.5]: https://github.com/regen-coordination/org-os-template/compare/v0.7.4...v0.7.5
+[0.7.4]: https://github.com/regen-coordination/org-os-template/compare/v0.7.3...v0.7.4
+[0.7.3]: https://github.com/regen-coordination/org-os-template/compare/v0.7.2...v0.7.3
+[0.7.2]: https://github.com/regen-coordination/org-os-template/compare/v0.7.1...v0.7.2
+[0.7.1]: https://github.com/regen-coordination/org-os-template/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/regen-coordination/org-os-template/compare/v0.6.2...v0.7.0
 [0.6.2]: https://github.com/regen-coordination/org-os-template/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/regen-coordination/org-os-template/compare/v0.6.0...v0.6.1

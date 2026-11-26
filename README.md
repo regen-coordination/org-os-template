@@ -2,7 +2,7 @@
 
 > Framework + standards + orchestration hub.
 
-**Type:** Framework + orchestration hub · **Version:** 0.7.5 · **Status:** active
+**Type:** Framework + orchestration hub · **Version:** 0.7.6 · **Status:** active
 
 **Site:** <https://regen-coordination.github.io/org-os-template/>
 
