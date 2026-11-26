@@ -4,7 +4,7 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { parse, stringify } from 'yaml'
 import { afterEach, describe, expect, it } from 'vitest'
-import { publishPlan } from '../../../server/knowledge/gate.ts'
+import { previewEntry, publishPlan } from '../../../server/knowledge/gate.ts'
 import { readEntry, readKnowledge } from '../../../server/knowledge/read.ts'
 import { FIXTURE_NOW, makeBareRepo, makeKmsInstance, type FixtureInstance } from './fixture.ts'
 
@@ -219,5 +219,22 @@ describe('review fixes: what a run would publish is said where the steward reads
     const entry = await readEntry(instance.dir, 'resource', 'living-mulch', { now: FIXTURE_NOW })
     expect(entry.checks.find(c => c.field === 'your rule')!.value).toBe('Not selected')
     expect(entry.checks.find(c => c.field === 'your rule')!.note).toBe('not in the selection: its public use is not public yet') // walk D5
+  })
+})
+
+describe('a canon-shaped instance with no plane role: kms-admin shows what publish would publish (kms canon gate)', () => {
+  it('a draft with public use ok-with-caveat under a card that claims its corpus is not shown as published; a reviewed one is', async () => {
+    instance = makeKmsInstance()
+    // The fixture's card claims nothing; this one claims its checkout, so kms's selectPublic runs the canon gate too.
+    setEntry(instance.dir, 'source-system', 'seed-library', { url: 'https://github.com/example-dao/seed-library', origin_prefixes: ['repos/seed-library/'] })
+    const lineage = 'repos/seed-library/notes/x.md'
+    setEntry(instance.dir, 'resource', 'draft-note', { title: 'Draft note', type: 'resource', public_use: 'ok-with-caveat', maturity: 'draft', source_lineage: lineage })
+    setEntry(instance.dir, 'resource', 'reviewed-note', { title: 'Reviewed note', type: 'resource', public_use: 'ok-with-caveat', maturity: 'reviewed', source_lineage: lineage })
+    const view = await readKnowledge(instance.dir, { now: FIXTURE_NOW })
+    const row = (slug: string) => view.lanes.flatMap(l => l.rows).find(r => r.slug === slug)!
+    expect(row('reviewed-note').lane).toBe('published')
+    expect(row('draft-note').lane).not.toBe('published')
+    expect(row('draft-note').why).not.toBe('in the selection')
+    await expect(previewEntry(instance.dir, 'resource', 'draft-note', { now: FIXTURE_NOW })).rejects.toThrow(/No published entry resource\/draft-note/)
   })
 })

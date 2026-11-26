@@ -69,8 +69,9 @@ export const OPS = {
   ) },
 
   // publish: plan mode by default (what `close` runs); real PDS writes only with --apply
-  // (flags.apply) or publish.apply:true in kms.yaml. Framework gate is the floor; the
-  // instance gate can only narrow. Manifest is written only when applyPublish ran (right after it).
+  // (flags.apply) or publish.apply:true in kms.yaml. Framework gate is the floor; the canon gate
+  // (no role, canon-shaped knowledge base) and the instance gate can only narrow (selectPublic, src/gate.mjs).
+  // Manifest is written only when applyPublish ran (right after it).
   'publish': { kind: 'exec', write: true, run: async (ctx) => {
     const dir = ctx.dir || '.';
     const config = ctx.config || (ctx.config = loadKmsConfig(dir));
@@ -97,8 +98,16 @@ export const OPS = {
     const report = { dry, ...(regate ? { regate } : {}), atproto: { status: 'not-configured' }, static: null };
 
     const all = adapter.list(target);
-    const sel = await selectPublic({ dir, config, all });
+    // No role, but a canon-shaped knowledge base: selectPublic runs the canon gate too (src/planes/canon-gate.mjs), so a draft cannot
+    // leave on the framework floor alone. Malformed control data refuses before anything is minted or written.
+    let sel;
+    try { sel = await selectPublic({ dir, config, all }); }
+    catch (e) {
+      if (e?.code !== 'CANON_CONTROL_DATA') throw e;
+      return { ok: false, report: { dry, refused: 'canon-control-data', errors: e.errors, reason: 'this knowledge base holds source-system cards or public-use boundaries that are malformed, so publish cannot tell what it may publish; fix them (the errors name each one) and run publish again.' } };
+    }
     const candidates = sel.candidates;
+    if (sel.canonGate) report.canonGate = sel.canonGate;
     if (sel.withheld?.undeclared || sel.withheld?.visibility || sel.withheld?.claims) report.withheld = { ...(sel.withheld.undeclared ? { undeclared: sel.withheld.undeclared } : {}), ...(sel.withheld.visibility ? { visibility: sel.withheld.visibility } : {}), ...(sel.withheld.claims ? { claims: sel.withheld.claims } : {}) };
     if (sel.gated) {
       const by_reason = {}; for (const r of sel.rejected) by_reason[r.reason] = (by_reason[r.reason] || 0) + 1;
