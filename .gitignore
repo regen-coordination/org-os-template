@@ -66,11 +66,13 @@ packages/multica-bridge/config.yaml
 # would also match skills/symbient/ — the public framework skill directory.
 /symbient/
 
-# Graphify — commit data (graph.json, cache/, manifest.json, GRAPH_REPORT.md, cost.json),
-# ignore renderings and machine-local files
+# Graphify — commit data (graph.json, manifest.json, GRAPH_REPORT.md, cost.json),
+# ignore renderings, the cache and machine-local files
 graphify-out/graph.html
 graphify-out/.graphify_python
 graphify-out/.graphify_root
+# graphify's cache: rebuilt on every run, and its stat index records absolute paths on the machine that ran it
+graphify-out/cache/
 
 # Playwright test artifacts (site/)
 site/test-results/

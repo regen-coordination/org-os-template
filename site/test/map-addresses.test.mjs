@@ -3,7 +3,7 @@
 // or under a GitHub name nobody has registered.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { addressProblem, publicMap, mapProblems, PRIVATE_REPOS, UNREGISTERED_OWNERS } from "../scripts/map-addresses.mjs";
+import { addressProblem, publicMap, mapProblems, PRIVATE_REPO_HASHES, repoHash, UNREGISTERED_OWNERS } from "../scripts/map-addresses.mjs";
 
 test("an https address to a public place passes", () => {
   assert.equal(addressProblem("https://github.com/regen-coordination/coop"), null);
@@ -23,11 +23,17 @@ test("a folder inside another GitHub repository is refused", () => {
 });
 
 test("a private repository is refused, whatever the case, with or without .git or a sub-path", () => {
-  assert.ok(PRIVATE_REPOS.length > 0);
-  const [owner, name] = PRIVATE_REPOS[0].split("/");
-  assert.match(addressProblem(`https://github.com/${owner}/${name}`), /private/);
-  assert.match(addressProblem(`https://github.com/${owner.toUpperCase()}/${name}.git`), /private/);
-  assert.match(addressProblem(`https://www.github.com/${owner}/${name}/issues`), /private/);
+  const opts = { privateRepoHashes: [repoHash("someone/kept-private")] };
+  assert.match(addressProblem("https://github.com/someone/kept-private", opts), /private/);
+  assert.match(addressProblem("https://github.com/SOMEONE/kept-private.git", opts), /private/);
+  assert.match(addressProblem("https://www.github.com/someone/kept-private/issues", opts), /private/);
+  assert.equal(addressProblem("https://github.com/someone/kept-public", opts), null);
+});
+
+test("the shipped list of private repositories holds hashes, never names", () => {
+  assert.ok(PRIVATE_REPO_HASHES.length > 0);
+  for (const h of PRIVATE_REPO_HASHES) assert.match(h, /^[0-9a-f]{64}$/);
+  assert.equal(addressProblem("https://github.com/someone/kept-private"), null, "the default list is the shipped one");
 });
 
 test("an address under an unregistered GitHub name is refused: whoever registers the name would serve it", () => {

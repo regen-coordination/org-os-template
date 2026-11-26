@@ -34,8 +34,8 @@ org-os never writes into the graph; it builds it with the CLI and reads it.
 
 | Path | Committed |
 |---|---|
-| `graphify-out/graph.json`, `manifest.json`, `GRAPH_REPORT.md`, `cost.json`, `.graphify_labels.json`, `cache/` | yes |
-| `graphify-out/graph.html`, `.graphify_python`, `.graphify_root` | no, gitignored (machine-local) |
+| `graphify-out/graph.json`, `manifest.json`, `GRAPH_REPORT.md`, `cost.json`, `.graphify_labels.json` | yes |
+| `graphify-out/graph.html`, `.graphify_python`, `.graphify_root`, `cache/` | no, gitignored (machine-local; the cache's stat index records absolute paths) |
 
 `/initialize` shows a graph section from `graph-status.mjs` and hides it if there is no graph. `node scripts/graph-gaps.mjs --test` passes on the fixtures in `scripts/test/graph-fixtures/`.
 
