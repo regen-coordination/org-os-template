@@ -2,6 +2,8 @@
 
 _Living checklist of active tasks and system health. Agents consult on every session. Update regularly — mark done, add new, remove stale._
 
+**Status (2026-11-25):** the framework is at **0.7.5** (released 2026-11-25; tags `v0.6.0` to `v0.7.5`). `v0.5.0` shipped on 2026-08-29. The "v0.5 release in flight" section below dates from 2026-08-28 and has not been revised since; what was released after it, and the state of each v0.6 Active, is in [`docs/agent-plans/QUEUE.md`](docs/agent-plans/QUEUE.md).
+
 ---
 
 ## 🚢 v0.5 release in flight (2026-08-28)

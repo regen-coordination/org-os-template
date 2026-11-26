@@ -1,0 +1,76 @@
+---
+// The prompt bar: the keys that work on this page, as key caps, in the corner —
+// after the system menus of early-2000s consoles. Every hint is also a control,
+// so it works with a pointer. Hidden until script runs (without script the keys
+// do nothing), on touch screens, and on narrow ones. The arrow keys act only
+// when nothing has focus (lib/shortcuts.mjs decides); the Theme hint is a
+// button only — the page has no single-letter key for it.
+interface Props { prev?: string; next?: string; }
+const { prev, next } = Astro.props;
+---
+<div class="prompt-bar mono" role="group" aria-label="Keyboard shortcuts" data-pagefind-ignore hidden>
+  {prev && <a class="hint" href={prev} data-key="ArrowLeft" aria-keyshortcuts="ArrowLeft"><kbd aria-hidden="true">←</kbd>Previous</a>}
+  {next && <a class="hint" href={next} data-key="ArrowRight" aria-keyshortcuts="ArrowRight"><kbd aria-hidden="true">→</kbd>Next</a>}
+  <button type="button" class="hint" data-key="/" aria-keyshortcuts="/" data-press=".search-open"><kbd aria-hidden="true">/</kbd>Search</button>
+  <button type="button" class="hint" data-press=".theme-toggle"><span class="mark" aria-hidden="true">◐</span>Theme</button>
+</div>
+<script>
+  import { pageShortcut } from "../lib/shortcuts.mjs";
+
+  const bar = document.querySelector<HTMLElement>(".prompt-bar");
+  if (bar) {
+    bar.hidden = false;
+    const hints = [...bar.querySelectorAll<HTMLElement>(".hint")];
+    // A hint that stands for another control presses that control.
+    for (const hint of hints) {
+      const target = hint.dataset.press;
+      if (target) hint.addEventListener("click", () => document.querySelector<HTMLElement>(target)?.click());
+    }
+    document.addEventListener("keydown", (event) => {
+      const active = document.activeElement;
+      const hintKey = pageShortcut(event, {
+        activeTag: active ? active.tagName : null,
+        barVisible: getComputedStyle(bar).display !== "none",
+        dialogOpen: document.querySelector("dialog[open]") !== null,
+      });
+      if (!hintKey) return;
+      const hint = hints.find((h) => h.dataset.key === hintKey);
+      if (!hint) return;
+      event.preventDefault();
+      hint.dataset.struck = "";
+      window.setTimeout(() => delete hint.dataset.struck, 180);
+      hint.click();
+    });
+  }
+</script>
+<style>
+.prompt-bar {
+  position: fixed; right: var(--gutter); bottom: var(--space-4); z-index: 40;
+  display: flex; align-items: center; gap: var(--space-4);
+  padding: 0.3rem 0.75rem; border-radius: var(--radius-pill);
+  border: var(--border-hair) solid var(--color-line);
+  background: var(--color-bg);
+  font-size: var(--text-2xs); letter-spacing: var(--tracking-wide); text-transform: uppercase;
+  color: var(--color-muted);
+}
+.prompt-bar[hidden] { display: none; }
+.hint {
+  display: inline-flex; align-items: center; gap: 0.6em;
+  background: none; border: 0; padding: 0; color: inherit; font: inherit;
+  letter-spacing: inherit; text-transform: inherit; cursor: pointer;
+  transition: color var(--t-fast);
+}
+.hint:hover, .hint[data-struck] { color: var(--color-ink); }
+.hint kbd {
+  display: inline-grid; place-items: center; min-width: 1.6em; height: 1.6em; padding: 0 0.35em;
+  font-family: var(--font-mono); font-size: 1em; color: var(--color-ink);
+  border: var(--border-hair) solid var(--color-line-2); border-bottom-width: 2px; border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  transition: border-color var(--t-fast);
+}
+.hint .mark { display: inline-grid; place-items: center; min-width: 1.6em; color: var(--color-ink); }
+.hint:hover kbd, .hint[data-struck] kbd {
+  border-color: var(--color-accent);
+}
+@media (max-width: 899px), (hover: none), print { .prompt-bar { display: none; } }
+</style>

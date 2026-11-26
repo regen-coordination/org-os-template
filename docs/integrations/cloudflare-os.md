@@ -1,318 +1,70 @@
-# Cloudflare OS Integration — Platform Discovery & Runbook
+# Cloudflare OS Integration
 
-**Pinned cloudflare-os commit:** `1cb5e3d9096589e38f3fcfaf3f2191aa95a4c592` (2026-08-07) · **Starter fork:** _pending — Task 1_ · **Deployed workspace:** _pending — Task 1_
-**Status:** M0 discovery — answers below drive Tasks 13 and 18.
+**Module:** `org-os-cloudflare-os`, catalogued `pilot` ([manifest](../../modules/org-os-cloudflare-os/module.yaml), [catalogue entry](../MODULES.md)). Built and verified on a local Cloudflare OS stack; not deployed. Design: [Cloudflare OS integration design](../superpowers/specs/2026-08-08-cloudflare-os-org-os-integration-design.md). Package: [`packages/cloudflare-os-integration`](../../packages/cloudflare-os-integration/README.md).
 
-> **Evidence basis.** Everything below was established by **reading the pinned source**
-> (`~/code/cloudflare-os`, primarily `AGENTS.md`, `README.md`, `docs/blueprints.md`,
-> `packages/workshop-shared/src/gatekeeper.ts` — the 1109-line contract — and
-> `packages/gatekeeper-spotify` / `packages/gatekeeper-context`). It has **not** yet been
-> confirmed against a running instance: `pnpm install` / `pnpm run-local` and the deploy are
-> still pending. Claims marked ⚠️ are the ones a local run should verify first.
->
-> Cloudflare OS was open-sourced 2026-08-05 and is explicitly labelled early access ("version 2,
-> a complete rewrite"). Treat this document as pinned to the commit above; re-read on upgrade.
+[Cloudflare OS](https://os.cloudflare.app/) is Cloudflare's workspace product (early access and open-sourced 2026-08-05, per its announcement; upstream claim, not checked here). This module lets a Cloudflare OS workspace read org-os instances: their registries, federation, schemas, rendered pages and a grounding bundle for the workspace agent, so people who never touch git can ask an agent about an org's real state from a browser. The git repository stays canonical; the workspace holds only thin wiring. It is read-only. There is no write path.
 
----
+The pieces:
 
-## D1. Gatekeeper authoring interface
+- **The core** (`src/page-core`, `src/substrate`, `src/gatekeeper`): pure, runtime-agnostic JavaScript. Page rendering, a substrate interface with an in-memory driver and a GitHub driver, and the five capabilities. `scripts/page-shim.mjs` (`npm run page <id>`) imports the same page renderer.
+- **The adapter** (`src/adapter/gatekeeper-org-os`): a Cloudflare Worker, a "gatekeeper" in Cloudflare OS terms, that wires the core to the platform.
+- **A gadget blueprint** (`blueprints/org-dashboard/gadget.html`): a dashboard that calls `get_page`.
 
-A gatekeeper is a **separate Cloudflare Worker**. The contract is
-`packages/workshop-shared/src/gatekeeper.ts`, and it has **three layers**, not one:
+## What is verified, and what is not
 
-| Layer | Type | Role | Key members |
-|---|---|---|---|
-| Vendor | `GatekeeperVendor extends WorkerEntrypoint` | The Worker entrypoint; the service as a whole | `describe(): VendorDescription`, `connectAccount(callback, options)`, `createAccount?()` |
-| Account | `GatekeeperUser extends WorkerEntrypoint` | One connected account | `describe(): AccountDescription`, `getVerifier()`, `startAppUi?(context)` |
-| Resource | `Gatekeeper<Session> extends DurableObject` | One bound resource | `describe(): ResourceDescription`, `getTypeScriptTypes()`, `getAutoApprovableActions()`, `startSession(approvalQueue)`, `getAgentCatalog?()`, `addObserver()`, `removeObserver()` |
+| Level | State |
+|---|---|
+| Built | The core, the adapter source and the gadget source. `npm run test:cloudflare-os-integration` runs 86 tests. On this branch, 84 pass and 2 fail: the two `daysUntil` tests are time-zone dependent (they pass with `TZ=UTC`). |
+| Verified against a live service | On a local Cloudflare OS stack (wrangler and workerd, upstream commit `1cb5e3d`, 2026-08-07), 2026-08-08 and 2026-08-09: `types:check` silent, the `GATEKEEPER_ORG_OS` binding present, `GET /gatekeeper/org-os/` returns 200, and the core read live GitHub data for a public hub (`get_registry` 13 projects, `get_page` rendered) and for a private instance (`get_registry` 27 projects, `get_federation` with 8 peers, `get_page` dashboard), each with a commit sha and `stale: false`. Separately, on 2026-08-09, a model provider was configured and its model list read live. |
+| Not verified | The workspace agent calling a capability in chat. Anything in a deployed workspace: no starter fork or deployment is recorded. The org-dashboard gadget installed in a workspace, and its `rpc.mjs` shim (see below). Exporting the gadget to a `.gadget` blueprint archive. The `NO_DEFAULT_CRED_INPUTS` and deploy-wizard behaviour for a credential-free gatekeeper on the upstream deploy path. |
+| In production use | No. |
 
-### ⚠️ The single most important finding for our design
+The statements above about the platform come from the adapter's notes of the 2026-08-08 and 2026-08-09 runs and from reading the pinned Cloudflare OS source; they were not re-run in this pass. The repository's tests were.
 
-**Capabilities are not declared as named tools with JSON schemas.** The plan (Task 13 Step 2)
-assumed an MCP-shaped registry of `{name, description, schema}`. That is not how this platform
-works. Instead:
+## What it connects to
 
-- `startSession(approvalQueue)` returns a **`Session` object whose TypeScript methods _are_ the
-  capabilities**, reached over Cap'n Web RPC.
-- The agent is handed **type definitions**, via `Gatekeeper.getTypeScriptTypes(): Promise<string>`
-  — deliberately only the subset relevant to that resource, "rather than the entire API space of
-  the vendor."
-- Discovery metadata is separate and optional: `getAgentCatalog()`, bounded by
-  `AGENT_CATALOG_MAX_ENTRIES = 25`, id ≤256, title ≤100, description ≤400 chars.
+- A **Cloudflare account** and a **Cloudflare OS workspace**: the starter (`https://github.com/cloudflare/cloudflare-os-starter`, deployed from its README; upstream location, not checked here). Nothing in this repository deploys it.
+- **GitHub**, through its REST API, as the only substrate today: the gatekeeper reads each instance repository's files at a configured ref. The driver sits behind a substrate interface, so another driver can replace it without changing the capabilities.
+- A **model provider** configured in the workspace, for the agent. One that works: the workspace's Ollama provider slot, which is a generic OpenAI-compatible client, pointed at a compatible gateway's API URL with an API token. The `openai` slot does not work with compatibility gateways because it speaks the Responses API. A key whose account has no balance fails on completions with a credits error even though the model list loads.
 
-**Consequence for `packages/cloudflare-os-integration`:** our `handle(name, args)` dispatcher and
-its `{ok, data, provenance}` envelope remain correct as the *core*, but the adapter is not a
-schema registration — it is a thin `Session` class with five methods (`getRegistry`,
-`getFederation`, `getSchema`, `getContextBundle`, `getPage`) each delegating to `handle()`, plus a
-`types.d.ts` shipped through `getTypeScriptTypes()`. The envelope becomes the method's return
-type, which is strictly better: the agent sees `provenance` in the type signature.
+## Capabilities
 
-### Template to copy
+The Worker's session object (bound in the workspace as `ORG_OS`) has two methods: `listInstances()` and `instance(id)`. `instance(id)` returns a per-instance object with the five read methods: `getRegistry(name)`, `getFederation()`, `getSchema(name)`, `getContextBundle()` and `getPage(pageId)`, for example `session.instance("my-org").getRegistry("projects")`. Each calls the core capability of the same name in snake case:
 
-- **`packages/gatekeeper-context`** is the closest analogue and the recommended base: it is
-  auto-provisioned (no OAuth), provides an agent singleton session, implements `getAgentCatalog`,
-  and ships a management UI. That is nearly our exact shape.
-- `packages/gatekeeper-spotify` is the smaller/simpler read if you want the plain OAuth+resource
-  pattern without the singleton machinery.
-- Both use `capnweb-validate` (`validateRpc`, `skipRpcValidation`) on RPC entry points.
+| Capability | Returns |
+|---|---|
+| `get_registry` | `data/<name>.yaml`, parsed |
+| `get_federation` | the instance's `federation.yaml`, parsed |
+| `get_schema` | `.well-known/<name>.json` |
+| `get_context_bundle` | identity, agent rules, memory index, the five most recent decisions and registry snapshots, each section cut to 64,000 characters with a flag; a missing file becomes `null` |
+| `get_page` | one rendered page: `dashboard`, `projects`, `tasks`, `instances`, `decisions`, `plans` or `this-week` |
 
-Package files needed: `wrangler.jsonc`, `package.json`, `tsconfig.json`,
-`worker-configuration.d.ts`, `src/*.ts`, `src/types.d.ts` (+ `types.txt` for the agent).
+The core's `handle()` (in `src/gatekeeper/capabilities.mjs`) answers with an envelope, `{ ok: true, data, provenance: { instance, sha, date, stale } }` or `{ ok: false, error: { code, message } }`. The Worker adapter unwraps it: on success a method returns `{ data, provenance }` (`getPage` returns `{ pageId, markdown, provenance }`); on failure it throws an `Error` carrying only the message, so the error code never reaches the workspace caller. `instance(id)` for an unconfigured id throws "isn't a configured org-os instance" (the core's own code for that case is `UNKNOWN_INSTANCE`). `provenance.sha` is the commit the data was read from, so the agent can say where an answer came from. `stale: true` means the GitHub read failed and a cached copy was served. Names passed to `get_registry` and `get_schema` must be lower-case letters, digits and hyphens. Every read calls `authorizeObservation()` before it fetches, so an observation the user would deny never reaches GitHub. The substrate caches by ETag with a 60-second default TTL and serves last-known-good content if a refresh fails; the cache is an in-memory map inside the Durable Object.
 
-## D2. Gatekeeper registration & deployment
+## Setup
 
-**Registration is a binding change — nothing else.** From `AGENTS.md` on `packages/router`:
-it routes `/gatekeeper/<name>/*` "to whichever gatekeepers are bound (**discovered by scanning its
-own `GATEKEEPER_*` service bindings**, so installing a gatekeeper is purely a binding change)."
+Run these in order; each step's check gates the next. All of it needs a Cloudflare account and is outside the repository's tests.
 
-✅ **Confirmed by running it (Task 3, 2026-08-08).** In local dev it is even simpler than that:
-`run-dev-server.js` (`findGatekeepers`, line 62) scans `packages/` for any directory named
-`gatekeeper-*` containing a `wrangler.jsonc`, derives the binding name
-(`gatekeeper-helloworld` → `GATEKEEPER_HELLOWORLD`) and writes it into a generated
-`wrangler.dev.jsonc`. **Dropping the directory in is the entire install** — no config file to
-edit anywhere. Verified end to end:
+1. **Deploy the starter** into your Cloudflare account. Check that the workspace loads, a document can be created, and the agent chat responds.
+2. **Install the adapter.** Follow [the adapter runbook](../../packages/cloudflare-os-integration/src/adapter/README.md): copy `src/adapter/gatekeeper-org-os` into the workspace's `packages/`; there, run `ORG_OS_REPO=<path to this repository> node scripts/sync-core.mjs` (it vendors the core by copy, because the workspace is a separate pnpm workspace and cannot resolve a sibling repository) and `node scripts/sync-types.mjs`; run `pnpm exec wrangler types`; in `worker-configuration.d.ts` point `mainModule` at `./src/org-os` instead of the build output; then `pnpm run types:check`, which must be silent; then, in the workspace root, `pnpm install && pnpm run-local`. The check is that `GATEKEEPER_ORG_OS` appears in the binding list and `GET /gatekeeper/org-os/` returns 200. In local dev, a `gatekeeper-*` directory containing a `wrangler.jsonc` is bound automatically as `GATEKEEPER_ORG_OS`. On the starter's deploy path the slot is `workers.customGatekeeper.name` in `deployment.jsonc`.
+3. **Configure the instances.** Set `ORG_OS_INSTANCES` in the adapter's `wrangler.jsonc` `vars`: a JSON array of `{ "id", "owner", "repo", "ref" }`, where `ref` defaults to `main`. Repository coordinates are public, so this is not a secret. Each `id` is lower-case letters, digits and hyphens and unique; `owner` and `repo` use GitHub's character set; a bad entry stops the Worker at startup. The `wrangler.jsonc` in the repository still carries the maintainer's example instances and a work-branch `ref`; replace them with yours.
+4. **Set the token.** Put a fine-grained GitHub personal access token with `contents: read` only, as a Wrangler secret: `pnpm exec wrangler secret put ORG_OS_GITHUB_TOKEN --name gatekeeper-org-os`. Do not grant write scopes. A public repository can be read without a token, at GitHub's lower unauthenticated rate limit; a private one needs it. A fine-grained token is limited to one resource owner, so instances under different owners need separate arrangements. For local development, the multi-worker dev server does not read per-package secrets: add `"gatekeeper-org-os": ["ORG_OS_GITHUB_TOKEN"]` to `PASSTHROUGH_GATEKEEPER_VARS` in the workspace's `run-dev-server.js` (a local edit) and put the token in the workspace's gitignored `.dev.vars`.
+5. **Configure the model** in the workspace, as above.
+6. **Acceptance in chat.** Ask the workspace agent what the active projects are, what the last three decisions were, who the peers in a federation are, and what is urgent now, and compare each answer with the repository. Then ask which commit the answer came from; it should report the provenance sha. The repository records no completed run of this step.
+7. **Install the gadget** (optional). Create a gadget in the workspace and paste `blueprints/org-dashboard/gadget.html` as its source. The file imports `callCapability` from `./rpc.mjs`, which is not in the repository, and expects `callCapability(name, args)` to resolve to `{ ok: true, data, provenance }` or `{ ok: false, error: { code, message } }`, with `args = { instance, page_id }`. The adapter does not return that shape, so the shim must do three things: take the injected `ORG_OS` session binding and call `binding.instance(args.instance)` first, then the method with a positional argument (`getPage(args.page_id)`); catch the `Error` the adapter throws and turn it into `{ ok: false, error: { code, message } }`; and wrap a success as `{ ok: true, data: { markdown }, provenance }`. How the workspace injects the binding into a gadget was read from source and has not been observed in a running gadget, so the shim is untested. The gadget's source is the version of record; change it here and reinstall rather than editing it in the workspace. It renders only `error.code` and `error.message`, never `error.detail`, which can carry raw upstream bodies.
+8. **When it is live,** update the module's status in [Modules](../MODULES.md) and in `site/src/data/modules.yaml`, which a test requires to agree.
 
-```
-env.GATEKEEPER_HELLOWORLD (gatekeeper-helloworld#GatekeeperVendor)   Worker   local
-[wrangler:info] GET /gatekeeper/helloworld/ 200 OK (4ms)
+## Security posture
+
+The gatekeeper is provisioned automatically and reads through one deployment-level token, not per-user OAuth. So every signed-in workspace user has the same access to the same repositories; `addObserver()` accepts unconditionally; and the contents of a private instance are readable by every workspace user. The boundary is workspace membership, enforced upstream at sign-in. That is safe only while workspace membership is close to organisation membership. If different users must see different data, the gatekeeper has to move to per-user OAuth and `addObserver()` must gain a real check.
+
+## Commands
+
+```bash
+npm run test:cloudflare-os-integration   # the package's tests (node --test)
+npm run page -- dashboard                # the same page renderer, from local instance data; runs scripts/initialize.mjs (its output includes a "Checking Notion API" info line) and is a transitional bridge (also: projects, tasks, instances, decisions, plans, this-week)
 ```
 
-For the **starter**, the equivalent slot already exists: `packages/custom-gatekeeper` plus the
-`workers.customGatekeeper.name` entry in `deployment.jsonc`, bound by `scripts/deploy.mjs` as
-`GATEKEEPER_CUSTOM`.
+## What it writes and where
 
-**Config and secrets:**
-- Per-package `wrangler.jsonc` is the source of deployment config.
-- The release manifest is generated from it by `scripts/release/manifest-lib.mjs`, with
-  account-specific values replaced by placeholders (`$ACCOUNT_ID`, `$WORKER_NAME(...)`,
-  `$SECRET(...)`, `$PUBLIC_BASE_URL`).
-- **Credential-free provisioning.** The deploy wizard defaults a gatekeeper's inputs to OAuth
-  `CLIENT_ID`/`CLIENT_SECRET`, and *"the wizard blocks Install on unfilled secret inputs, so a
-  spurious default makes a gatekeeper uninstallable."* org-os uses a GitHub PAT, not an OAuth app.
-  On the **upstream** path that means opting out via `NO_DEFAULT_CRED_INPUTS` in
-  `manifest-lib.mjs`; on the **starter** path `packages/custom-gatekeeper` already models the
-  credential-free shape (`autoProvisionsAccount: true`, `providesAuth: false`, no connect flow),
-  so following it avoids the trap by construction. The PAT goes in a Wrangler secret.
-- Admin enable/disable is enforced at one chokepoint: `user.ts:getGatekeeperClassFor()`.
-
-**Local dev:** `pnpm run-local` runs the whole stack on wrangler + workerd at
-`http://localhost:8787`. `pnpm dev-server` runs the router in dev mode proxying to Vite.
-Checks before pushing: `pnpm lint` (= `lint:check` oxlint + `types:check` recursive `tsc --noEmit`).
-
-## D3. Capability invocation from agent chat
-
-**The agent does not call tools — it executes code.** Per `AGENTS.md`:
-
-- An account may declare an **ambient singleton** (`AccountDescription.singleton: { tsType }`).
-- The Workshop auto-provides that singleton to the owner's workspaces as an **ambient gatekeeper
-  record**, folded into each chat's env as a **named chat binding** — named by the gatekeeper's
-  `suggestedBindingName`, assembled in `prepareChatBindings` (`overseer.ts`).
-- The agent reads it inside **`executeCode`** via `getSession()` / `getAgentCatalog()`, and **each
-  read is recorded as an observation**.
-
-### ⚠️ This settles the open Task 14 question
-
-The plan flagged: *"question 4 is answerable only if the agent calls capabilities mid-conversation
-rather than getting one context injection at conversation start."* Because the agent runs code
-per turn against a live binding, **it can invoke capabilities mid-conversation**. Acceptance
-question 4 ("what tasks are urgent right now?") stands as written — it will route through
-`get_page`/`get_registry` on demand. No need to widen the context bundle.
-
-Note the binding is ambient for *chats* but **not bound to any gadget by default**; the agent
-wires it into a gadget with `setGadgetBinding` when the gadget's code needs it.
-
-## D4. Gadget → gatekeeper RPC
-
-Transport is **Cap'n Web** over a persistent WebSocket (reference:
-`packages/workshop-shared/node_modules/capnweb/README.md`; the frontend↔backend API is
-`packages/workshop-shared/src/api.ts`).
-
-The gadget does **not** fetch an endpoint. It receives the `Session` capability — the object
-returned by `Gatekeeper.startSession()` — as a **named binding**, and calls methods on it
-directly.
-
-### ⚠️ Consequence for `blueprints/org-dashboard/gadget.html`
-
-The gadget as committed imports `callCapability` from a hypothetical `./rpc.mjs` and calls
-`callCapability("get_page", {...})`. That indirection is unnecessary here. The real shape is
-closer to:
-
-```js
-// `orgOs` is the named binding (suggestedBindingName), injected by the Workshop.
-const r = await orgOs.getPage({ instance, page_id: page });
-```
-
-The `rpc.mjs` seam should therefore become a **~3-line shim** that adapts the injected binding to
-the existing `callCapability(name, args)` contract, so `gadget.html` needs no change:
-
-```js
-export const callCapability = (name, args) =>
-  orgOs[name.replace(/_([a-z])/g, (_, c) => c.toUpperCase())](args);
-```
-
-Confirm the exact binding-injection idiom against a running gadget before finalising (⚠️ — read
-from source, not yet observed live).
-
-## D5. Context ingestion
-
-**A native mechanism exists, and the plan did not know about it: `packages/gatekeeper-context`,
-"The Context Library".**
-
-- An auto-provisioned gatekeeper whose account provides a **singleton read session + a management
-  UI**, for authoring **collections of context documents that agents read as observations**.
-- Two visibilities: **private** (one account) and **public** (created/edited only by deployment
-  admins, **readable by everyone and auto-enabled for all users**).
-- State: three Durable Objects (`ContextCollectionDurableObject`, `UserLibraryDurableObject`,
-  `LibraryRegistryDurableObject`) plus a KV namespace, all namespaced by `sharingDomain`.
-
-### Recommendation: keep `get_context_bundle`, treat the Context Library as an optional mirror
-
-The plan called the capability route a "fallback". Given what the Context Library actually is,
-**the capability is the better primary**, not a fallback:
-
-| | `get_context_bundle` (ours) | Context Library (native) |
-|---|---|---|
-| Freshness | Live from git at request time | A copy, authored/pasted, drifts |
-| Provenance | Every bundle stamped with commit sha | None |
-| Federation | Any instance, selected per call | Per-workspace collections |
-| Effort | Already built and tested | Manual authoring + upkeep |
-
-Git is canonical in our architecture; a hand-maintained copy of `IDENTITY.md` in a workspace DO
-contradicts that. **Decision: primary = `get_context_bundle`.** A public Context Library
-collection holding a short "what org-os is / call `get_context_bundle` first" pointer is a cheap,
-optional addition that improves cold-start behaviour without duplicating org state.
-
-## D6. Blueprint file format
-
-Yes — blueprints have a file representation, but **not the one we assumed**.
-
-- A blueprint captures a **Yjs source snapshot** (stripped of edit history), **binding
-  requirements** (shape only — no credentials), and metadata. It does **not** capture SQLite
-  storage, chat history, or live connections.
-- Exportable to a **`.gadget` archive**, importable into a different Workshop instance.
-- IDs: user blueprints get a 128-bit random hex ID; **bundled** blueprints carry stable readable
-  IDs (e.g. `format.document`) and ship as `<name>.gadget` + a `<name>.json` sidecar in
-  `packages/workshop-backend/format-blueprints/`, globbed by
-  `scripts/build-format-blueprints.mjs`. `FORMAT_BLUEPRINTS_DIR` lets a fork ship its own set
-  without touching the submodule. Add one with
-  `pnpm import:format-blueprint <export.gadget> --new <name>`.
-- Sharing link: `https://<host>/blueprint/<blueprint-id>`. **Never edit a `blueprintId` after
-  deploy** — install and promotion are keyed on it and a rename orphans the old entry.
-
-### ⚠️ Consequence for our repo copy
-
-`packages/cloudflare-os-integration/blueprints/org-dashboard/gadget.html` is **not directly
-installable**. A `.gadget` archive is produced *from a live gadget*, so the flow is: create the
-gadget in the workspace → paste our HTML as its source → export blueprint → commit the `.gadget`
-next to the HTML. The HTML stays the human-editable source of truth; the `.gadget` is the
-distributable artifact. `blueprints/org-dashboard/README.md` should be updated to say so.
-
-## D7. Human-in-the-loop approval
-
-Deeper than the plan assumed, and **directly relevant to M1**, not just M3.
-
-**Everything goes through the approval queue.** From `Gatekeeper.startSession()`'s contract:
-*"Every operation performed through this session must be submitted to the approval queue.
-Observations (read-only operations) must be authorized before data is returned to the caller.
-Side-effecting actions must not actually be performed until they are approved."*
-
-- **Observations (reads — all of M1):** must call `approvalQueue.authorizeObservation()` **before
-  returning data**. Each carries an `ObservationDescription { title, description }` in Markdown.
-  Flags: `prohibitAllSharing` (maximally sensitive → gadget drops into lockdown, sharing forever
-  prohibited) and `excludeObservers[]`. **Our four read capabilities each need an
-  `authorizeObservation()` call — this is required work in Task 13, not optional.** Public repo
-  data should set neither flag.
-- **Actions (writes — M3):** queued, not executed. The platform's notable innovation is
-  **asynchronous approval with simulation**: the gatekeeper simulates the outcome so the agent can
-  keep working and queue dependent actions; the user approves later, in bulk or one-by-one.
-  Approved → the overseer calls back to apply. `ActionDescription.implementsRevert` tells the UI
-  whether revert is offered.
-  **Good news for our M3 design:** "open a PR" is cleanly revertable (close it), so
-  `implementsRevert: true` is honest — and PR-only writes fit the queue model almost exactly.
-- `ActionKind { tag, label }` — `tag` is a stable policy enum; `getAutoApprovableActions()`
-  returns the *potential* auto-apply set, while the per-action `autoApprovable` verdict is the
-  binding gate.
-- **Observer model** (`docs/observers.md`): sharing a gadget requires each new observer to have
-  their own connected account with privileges covering everything the gadget has read, verified
-  inside the gatekeeper's trust domain via `addObserver(id, verifier)`. For org-os reading
-  **public** repos this should be permissive, but `addObserver` must still be implemented — for a
-  public repo it can succeed unconditionally; for a private one it must check the observer's token
-  actually grants read.
-
----
-
-## Deployment runbook (operator checklist)
-
-Everything here needs a Cloudflare account and is deliberately outside every implementation
-plan — the in-repo work is done and verified against a **local** Cloudflare OS stack. Work
-top to bottom; each step's verification gates the next.
-
-- [ ] **1. Deploy the starter.** Fork `https://github.com/cloudflare/cloudflare-os-starter`,
-      deploy it into the pilot Cloudflare account (its README, or `https://os.cloudflare.app/deploy`).
-      **Verify:** the workspace URL loads, a document can be created, the agent chat responds.
-      **Record** the deployed URL and starter fork URL in this file's header.
-
-- [ ] **2. Install `gatekeeper-org-os`.** Follow "Install" in
-      [`../../packages/cloudflare-os-integration/src/adapter/README.md`](../../packages/cloudflare-os-integration/src/adapter/README.md):
-      copy the adapter into the workspace, run `sync-core.mjs` + `sync-types.mjs`, generate
-      Worker types, apply the `mainModule` fix, `pnpm run types:check`.
-      **Verify:** `types:check` silent; `GATEKEEPER_ORG_OS` appears in the binding list.
-
-- [ ] **3. Configure instances and the token.** Set `ORG_OS_INSTANCES` in `wrangler.jsonc`
-      (hub + `refi-bcn-os`) and put a fine-grained PAT — **`contents: read` only**, scoped to
-      `refibcn` — in the `ORG_OS_GITHUB_TOKEN` secret. Do **not** grant `pull-requests:write`;
-      nothing before M3 opens a PR.
-      **Check the hub `ref`:** it is pinned to the work branch because the integration is not on
-      `main`. Update it when the branch merges, or the gatekeeper reads a stale tree.
-
-- [ ] **4. Configure the model.** Ollama provider slot (the OpenAI-compatible one), API URL
-      `https://opencode.ai/zen/go/v1`, the workspace's Go API key. The `openai` slot does not
-      work — it speaks the Responses API. **Verify:** the model list populates, and a trivial
-      chat completes (a `CreditsError` here means billing, not configuration).
-
-- [ ] **5. M1 acceptance — org chat with real context.** In the deployed workspace chat, ask and
-      verify each answer against the repos:
-      1. "What are the active projects in org-os?" → matches `data/projects.yaml`
-      2. "What were the last three decisions?" → matches `DECISIONS.md`
-      3. "What's in refi-bcn-os's federation — who are its peers?" → matches its `federation.yaml`
-      4. "What tasks are urgent right now?" → consistent with `HEARTBEAT.md` due dates.
-         (This one requires mid-conversation capability invocation, which §D3 confirms the
-         platform does — the context bundle alone does not carry `HEARTBEAT.md`.)
-
-      Then ask "which commit is this from?" — the agent should report the provenance sha.
-      **Record** the four Q/A pairs and their shas under "M1 acceptance evidence" below.
-
-- [ ] **6. Install the org-dashboard gadget.** Create a gadget in the workspace, paste
-      `packages/cloudflare-os-integration/blueprints/org-dashboard/gadget.html` as its source,
-      and write `rpc.mjs` — a ~3-line shim adapting the injected binding to
-      `callCapability(name, args)` (§D4).
-      **Verify:** the dashboard renders for the hub; the instance switcher re-renders for
-      `refi-bcn-os`; all 7 pages load; the provenance footer shows a real sha; and revoking the
-      token (or going offline past the cache TTL) shows the **STALE** badge rather than an error.
-
-- [ ] **7. Export the blueprint.** Export the gadget to a `.gadget` archive and commit it next to
-      the HTML (§D6 — the HTML stays the human-editable source; the archive is the
-      distributable). **Verify:** importing the archive into a second workspace reproduces the
-      gadget.
-
-- [ ] **8. Flip the status.** Update `docs/MODULES.md` — `org-os-cloudflare-os` status `pilot` →
-      `live` — and `site/src/data/modules.yaml` to match. Run `cd site && npm test` to confirm
-      the catalog test still passes, and note the deployment in `DECISIONS.md`.
-
-## M1 acceptance evidence
-
-_(filled by runbook step 5 — requires the deployed workspace)_
-
-## Adapter wiring runbook
-
-_(filled by Task 13 — requires the M0 gate)_
-
-Design deltas already known, to fold in when writing it:
-1. Capabilities = `Session` methods + `getTypeScriptTypes()`, **not** a name/schema registry (§D1).
-2. `NO_DEFAULT_CRED_INPUTS` or a custom `deploy-inputs.json`, or Install is blocked (§D2).
-3. Every read capability must call `authorizeObservation()` before returning (§D7).
-4. Base the package on `gatekeeper-context`, not a stock OAuth gatekeeper (§D1).
-5. `rpc.mjs` is a ~3-line binding shim, not a fetch client (§D4).
-6. Instances (corrected 2026-08-08): hub is `regen-coordination/org-os-template` @
-   `autopoiesis-phase2-pilot`; peer is `refibcn/refi-bcn-os`. Token: fine-grained,
-   `contents:read`, those two repos only. No `pull-requests:write` before M3.
+Nothing in the repository, and nothing to GitHub: the integration only reads. In the workspace it holds a copy of the core under the adapter's `vendor/org-os-core/` (generated by `sync:core`; never edit it, and re-run the sync after any change to the package's `src`), an in-memory cache, and, if installed, the gadget.

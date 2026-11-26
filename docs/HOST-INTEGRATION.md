@@ -1,95 +1,71 @@
 # Host Integration
 
-org-os ships first-class integrations for two agent hosts beyond the standalone CLI: **opencode** and **hermes**. Every host gets the same surface — call `org_os_page <id>` to render any org-os page in the conversation, and (where the host supports it) `org_os_tui` to launch the interactive TUI in a managed pane.
+org-os works from any agent host that can read files and run shell commands. Two hosts beyond Claude Code get a packaged integration: **opencode** and **hermes**. Both give the agent a tool, `org_os_page <id>`, that renders an org-os page into the conversation.
 
-> **Status (2026-04-25):** Integrations are **live today** via `scripts/page-shim.mjs`, which renders 7 pages (`dashboard`, `projects`, `tasks`, `instances`, `decisions`, `plans`, `this-week`) using the existing `scripts/initialize.mjs` JSON output and `DECISIONS.md`. When the full TUI renderer ships (Task 12 of `docs/agent-plans/tui-dashboard-implementation.md`), the `npm run page` script retargets to `packages/tui/src/modes/print.mjs` and unlocks the full ~25-page catalog. No changes required in opencode or hermes — they pick up the upgrade transparently.
+> **What exists.** `npm run page <id>` runs `scripts/page-shim.mjs`, which renders seven pages: `dashboard`, `projects`, `tasks`, `instances`, `decisions`, `plans`, `this-week`. `dashboard` is `scripts/initialize.mjs --format=markdown`; the other six are rendered by `packages/cloudflare-os-integration/src/page-core/render-page.mjs` from `initialize.mjs`'s JSON state. The shim reads `DECISIONS.md` and the `QUEUE.md` in the framework's `agent-plans` directory under `docs/`, and hands them to the renderer as strings (the `decisions` and `plans` pages); the renderer itself reads no files. An instance made by the cloning engine keeps its queue at `docs/plans/QUEUE.md`, which the shim does not read, so the `plans` page does not work in an instance: it prints "QUEUE.md not found" (read from the code, not run against a clone). Any other id exits with status 2 and lists the seven.
+>
+> **What does not exist.** An interactive terminal UI. The plans `tui-dashboard.md` and `tui-dashboard-implementation.md`, in the framework's `agent-plans` directory under `docs/`, describe a `packages/tui` and `packages/tui-data` with a larger page catalogue and an `npm run tui` command; none of those packages or scripts is in this repository. The opencode tool `org_os_tui` still tries to run `npm run tui` and will fail until that exists; the page ids in the hermes tool's description (`health`, `attention`, `project/<id>` and the rest) are likewise not rendered yet.
 
 ## Compatibility matrix
 
-| Host          | Slash commands                       | Tools / mechanism                                                                                                                  |
-| ------------- | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
-| Standalone    | n/a                                  | `npm run tui` (interactive Ink), `npm run page <id>` (one-shot). Works in any terminal.                                              |
-| Claude Code   | `/initialize`, `/close`              | Existing skill at `skills/org-os-init/`. Agent embeds `npm run page <id>` output for drill-downs.                                    |
-| **opencode**  | `/dashboard`, `/initialize`, `/org-projects`, `/org-decisions`, `/org-this-week` | [`packages/opencode-integration/`](../packages/opencode-integration/) — npm plugin (tools: `org_os_page`, `org_os_tui`) **plus** `commands/*.md` slash-command templates installed via `install-commands.sh`. |
-| **hermes**    | `/dashboard`, `/initialize`, `/org_os_pages` | [`packages/hermes-integration/`](../packages/hermes-integration/) — Python tool (`org_os_page`) **plus** three skills (`SKILL.md` + `skills/dashboard/`, `skills/initialize/`) auto-registered as slash commands by hermes. Install via `install.sh`. |
-| tmux/zellij   | n/a                                  | Sibling pane, host-agnostic. None needed.                                                                                          |
+| Host | Slash commands | How it connects |
+|---|---|---|
+| Standalone | none | `npm run page <id>` in any terminal |
+| Claude Code | `/initialize`, `/close`, `/commit`, `/handoff`, `/skills`, `/sync` (`.claude/commands/`) | Reads `CLAUDE.md` and the skills. `skills/org-os-init/` is the session skill. The agent can run `npm run page <id>` for a drill-down. |
+| Cursor | the same six, in `.cursor/commands/` | Slash commands only |
+| **opencode** | `/dashboard`, `/initialize`, `/org-projects`, `/org-decisions`, `/org-this-week` from the integration package; `/close`, `/commit`, `/handoff`, `/skills`, `/sync` from `.opencode/commands/` | [`packages/opencode-integration/`](../packages/opencode-integration/README.md): a plugin registering `org_os_page` and `org_os_tui`, plus `commands/*.md` installed with `install-commands.sh` (`ln -sf`, so its `initialize.md` replaces any existing `.opencode/commands/initialize.md` of the same name, including the one this repository ships) |
+| **hermes** | `/dashboard`, `/initialize`, `/org_os_pages` | [`packages/hermes-integration/`](../packages/hermes-integration/README.md): a Python tool `org_os_page` and three skills that hermes registers as slash commands; installed with `install.sh` |
 
-## Why subprocess (not embedded UI)
+## Why a subprocess
 
-Agent CLIs are single-tenant: one TTY surface. A "live pane next to the chat" requires either a terminal multiplexer (tmux/zellij) or a host that owns the entire screen (hermes does, opencode partly via its multiplexer integration). Claude Code is sequential text in chat — it can spawn a modal subprocess but cannot host a persistent live UI alongside its conversation. Subprocess + multiplexer is the universal lower bound; the agent-print mode (`npm run page <id>`) is the universal embedded fallback.
+Agent CLIs have one terminal surface, so a live pane beside the chat needs a multiplexer (tmux or zellij) or a host that owns the screen. The integrations therefore stay thin: they shell out to `npm run page <id>` in the org-os repository and return the text. All page logic stays in this repository's scripts, so an upgrade to the renderer reaches every host without changes to the integrations.
 
 ## Install
 
 ### opencode
 
+Register the plugin in `opencode.json`:
+
 ```jsonc
-// opencode.json
 {
   "$schema": "https://opencode.ai/config.json",
   "plugin": ["@org-os/opencode-integration"]
 }
 ```
 
-Project-scoped: install at `.opencode/plugins/`. Global: `~/.config/opencode/plugins/`. The plugin auto-detects the org-os root from opencode's plugin context (`directory` / `worktree` / `project.directory`) and falls back to `ORG_OS_ROOT` env var.
+For project scope the package README says to place the plugin under `.opencode/plugins/`, and for global scope `~/.config/opencode/plugins/` (taken from the README; no code in this repository loads from those paths, so not verified). Whether `@org-os/opencode-integration` is published to npm was not checked (no network); the package is in this repository at `packages/opencode-integration/`. The plugin finds the org-os root from opencode's plugin context (`directory`, `worktree`, `project.directory`), then `ORG_OS_ROOT`, then the current directory.
 
-Tools registered: `org_os_page(page_id)`, `org_os_tui()`. opencode's multiplexer integration handles pane lifecycle for the TUI.
+Slash commands:
 
-Full README: [`packages/opencode-integration/README.md`](../packages/opencode-integration/README.md).
+```bash
+cd packages/opencode-integration
+./install-commands.sh            # symlinks commands/*.md into ./.opencode/commands/
+./install-commands.sh --global   # into ~/.config/opencode/commands/
+./install-commands.sh /path/to/project
+```
+
+Details: [`packages/opencode-integration/README.md`](../packages/opencode-integration/README.md).
 
 ### hermes
 
 ```bash
-export HERMES_HOME=~/code/hermes-agent
-export ORG_OS_ROOT=~/code/org-os
+export HERMES_HOME=/path/to/hermes-agent   # a hermes-agent checkout with skills/ and tools/
+export ORG_OS_ROOT=/path/to/this/org-os-instance
 cd packages/hermes-integration && ./install.sh
 ```
 
-The script symlinks `SKILL.md` and `tools/org_os.py` into hermes's `skills/` and `tools/` directories. After running, manually add `"org_os"` to a toolset in `$HERMES_HOME/toolsets.py` (typically `_HERMES_CORE_TOOLS`).
+The script symlinks `SKILL.md` into `$HERMES_HOME/skills/org_os_pages/`, the `dashboard` and `initialize` skills into `$HERMES_HOME/skills/`, and `tools/org_os.py` into `$HERMES_HOME/tools/`. Then add `"org_os"` to a toolset by hand (typically `_HERMES_CORE_TOOLS`) and restart hermes. The script's closing message names `$HERMES_HOME/toolsets.py`, while the header of `tools/org_os.py` names `hermes_cli/toolsets.py`; which is right depends on your hermes version and was not verified here.
 
-Tool registered: `org_os_page(page_id)`. Returns markdown-clean text from `npm run page <id>`.
+Details: [`packages/hermes-integration/README.md`](../packages/hermes-integration/README.md).
 
-Full README: [`packages/hermes-integration/README.md`](../packages/hermes-integration/README.md).
+## Adding a host
 
-## Pages reachable
+For a host such as goose or aider:
 
-The full list lives in `packages/tui-data/src/builtin-pages.mjs`. All hosts get the same pages.
+1. Create `packages/<host>-integration/` with the host's plugin or skill manifest.
+2. Register one tool, `org_os_page(page_id)`, that runs `npm run page --silent -- <id>` in the org-os root (`ORG_OS_ROOT`).
+3. Add a row to the matrix above.
 
-| Type | IDs |
-|---|---|
-| Section | `dashboard`, `projects`, `tasks`, `plans`, `instances`, `federation`, `members`, `ideas`, `funding`, `calendar`, `memory`, `decisions`, `skills`, `packages` |
-| Entity | `project/<id>`, `instance/<id>`, `plan/<id>`, `idea/<id>`, `member/<id>`, `skill/<id>`, `package/<id>`, `decision/<slug>` |
-| Cross-cut | `health`, `this-week`, `promotions`, `attention` |
+## Tests
 
-## Architecture
-
-Both integrations are intentionally thin shims over the same two entry points: `npm run page <id>` (one-shot render to stdout, ANSI-stripped, embeds in chat) and `npm run tui` (interactive Ink TUI). All page logic, data resolution, and navigation lives in `packages/tui-data/` and `packages/tui/`. Updating the TUI updates every host integration automatically.
-
-```
-        ┌─────────────────────────┐
-        │  packages/tui-data      │  pure Node, no UI
-        │  loaders + manifest +   │
-        │  resolvers + actions    │
-        └────────────┬────────────┘
-                     │
-       ┌─────────────┼─────────────────────────────┐
-       │             │                             │
-┌──────▼──────┐ ┌────▼──────┐ ┌──────────────────▼──────────────────┐
-│ packages/   │ │ scripts/  │ │  packages/{opencode,hermes}-        │
-│ tui (Ink)   │ │ initialize│ │  integration                        │
-│             │ │           │ │  (shim → npm run page / npm run tui)│
-│ interactive │ │ JSON for  │ │                                     │
-│ + print     │ │ /init     │ │  hosts: opencode, hermes            │
-└─────────────┘ └───────────┘ └─────────────────────────────────────┘
-```
-
-## Adding a new host
-
-To add support for, say, `goose` or `aider`:
-
-1. Create `packages/<host>-integration/`.
-2. Implement the host's plugin/skill manifest format.
-3. Register a single tool `org_os_page(page_id)` that shells out to `npm run page <id>` in `ORG_OS_ROOT`.
-4. (Optional) Register a second tool `org_os_tui()` if the host has multiplexer integration.
-5. Add a row to the compatibility matrix above.
-
-The pattern is the same across all hosts because the page resolution layer is host-agnostic.
+`cd packages/opencode-integration && node --test test/*.test.mjs` runs the plugin's smoke tests (3 pass on this branch).

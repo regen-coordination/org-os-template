@@ -5,8 +5,13 @@ import "../styles/tokens.css";
 import "../styles/theme.css";
 import "../styles/global.css";
 import { withBase } from "../lib/base";
+import { THEME_BOOT } from "../lib/theme-boot.mjs";
+import { themeColor } from "../lib/theme-color.mjs";
+import lightTheme from "../styles/themes/systems.css?raw";
+import darkTheme from "../styles/themes/systems-dark.css?raw";
 import Nav from "./Nav.astro";
 import Footer from "./Footer.astro";
+import PromptBar from "./PromptBar.astro";
 
 interface Props { title: string; description?: string; current?: string; noindex?: boolean; }
 const {
@@ -15,6 +20,8 @@ const {
   current = "home",
   noindex = false,
 } = Astro.props;
+const colorLight = themeColor(lightTheme);
+const colorDark = themeColor(darkTheme);
 ---
 <!doctype html>
 <html lang="en">
@@ -22,7 +29,9 @@ const {
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="description" content={description} />
-  <meta name="theme-color" content="#f6f4ed" />
+  <meta name="theme-color" content={colorLight} media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content={colorDark} media="(prefers-color-scheme: dark)" />
+  <script is:inline set:html={THEME_BOOT}></script>
   {noindex && <meta name="robots" content="noindex" />}
   <title>{title} · org-os</title>
   <link rel="icon" type="image/svg+xml" href={withBase("/favicon.svg")} />
@@ -32,5 +41,6 @@ const {
   <Nav current={current} />
   <main id="main"><slot /></main>
   <Footer />
+  <slot name="prompt"><PromptBar /></slot>
 </body>
 </html>

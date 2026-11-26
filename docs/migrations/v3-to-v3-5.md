@@ -1,10 +1,14 @@
 # Migration: v3.0 → v3.5
 
-**Status:** additive only. Re-runnable. No breaking changes.
+> **Version numbering: this page speaks in the legacy line (`1.x → 2.x → 3.x → 3.5`).** In 2026-06 the framework renumbered itself `3.5 → 0.5` (see [VERSIONING.md](../VERSIONING.md) and `VERSION.md`); the `0.x` line (now at `0.6`) is *later* than `3.5`. "v3.5" below means the fourth milestone of the old line.
+>
+> **Does an operator still need this page?** Rarely. The current framework already contains everything v3.5 introduced. What may still apply is the migration script: an older instance that lacks `genesis_commit` or `last_sync_commit` in `federation.yaml.metadata`, or has `data/packages-matrix.yaml` entries without `lifecycle_status`, can have them seeded by running `scripts/migrations/v3-to-v3-5-consolidation.mjs` (see below). For moving an instance onto the current framework, use `npm run doctor -- sync --dry-run` and then `npm run doctor -- sync` (see [VERSIONING.md](../VERSIONING.md)). The step list below is kept as the historical procedure, with the commands that no longer work as written corrected.
 
-## What v3.5 adds
+**Status:** additive only. Re-runnable. No deletions.
 
-The v3.5 release is themed **"Consolidation + Ready for Real Orgs"**. See `CHANGELOG.md [3.5.0]` for the full inventory. Highlights:
+## What v3.5 added
+
+The v3.5 release was themed "Consolidation + Ready for Real Orgs". See `CHANGELOG.md` (the `[0.5.0]` entry covers the renumbering) for the inventory. Highlights, taken from the old page and not re-counted:
 
 - **Lineage stamp** in `federation.yaml.metadata` — every instance gets `genesis_commit` (immutable) + `last_sync_commit` (mutable). This enables federated tooling to reason about how instances relate to framework history.
 - **Cloning engine** (`scripts/clone-framework.mjs`) — generate a new instance from a config file end-to-end.
@@ -12,45 +16,47 @@ The v3.5 release is themed **"Consolidation + Ready for Real Orgs"**. See `CHANG
 - **Reliability layer** — `scripts/selftest.mjs` aggregator, pre-commit hooks, CI workflows.
 - **Skills section** — operator-visible inventory (`/skills`, `SKILLS.md`, `.well-known/skills.json`).
 - **Package lifecycle** — `data/packages-matrix.yaml` gains `lifecycle_status` field.
-- **Promoted skills + scripts** — 5 skills + 5 scripts moved from instance-local to framework-canonical.
-- **Vault-safety promoted** from hub to framework (`scripts/vault-snapshot.mjs`, `vault-audit.mjs`, `docs/VAULT-SAFETY.md`).
+- **Promoted skills and scripts** — skills and scripts moved from instance-local to framework-canonical (see [SKILL-PROMOTION.md](../SKILL-PROMOTION.md)).
+- **Workspace safety promoted** from one hub to the framework (`scripts/vault-snapshot.mjs`, `vault-audit.mjs`, [VAULT-SAFETY.md](../VAULT-SAFETY.md)).
 
 ## What operators need to do
 
-**Per instance**, after pulling framework v3.5:
+**Per instance**, to apply the v3.5 changes to an old instance:
 
 ```bash
-# 1. Take a safety snapshot (vault-safety protocol; mandatory)
-npm run vault:snapshot -- "before v3.5 sync"
+# 1. Snapshot (it records tracked and staged files only; commit or copy aside untracked notes first)
+npm run vault:snapshot -- "before v3.5 migration"
 
-# 2. Pull the framework changes
-git pull upstream main
+# 2. Bring in the framework changes (refuses on a dirty tree; see `npm run sync:upstream` in COMMANDS.md)
+npm run sync:upstream -- --yes
 
-# 3. Run the migration (idempotent, additive, no data loss)
-npm run migrate -- --target v3.5
+# 3. Run the migration script directly (idempotent, additive)
+node scripts/migrations/v3-to-v3-5-consolidation.mjs
 
 # 4. Validate
 npm run validate:structure
 npm run validate:schemas
 npm run selftest
 
-# 5. If validators pass, commit
-git add federation.yaml data/packages-matrix.yaml memory/migrations-*.md
-git commit -m "chore: sync to org-os v3.5.0"
+# 5. If validators pass, commit the paths the script touched
+git add federation.yaml data/packages-matrix.yaml memory/migrations-*.md   # drop data/packages-matrix.yaml if your instance has none: git add fails on a missing path
+git commit -m "chore: apply the v3.5 lineage and lifecycle migration"
 ```
+
+Two corrections to the old procedure. `git pull upstream main` is replaced by `npm run sync:upstream`, the supported route; that script also refuses to run on a dirty tree. And the old `npm run migrate -- --target v3.5` step is replaced by running the script with `node`, which works whatever the instance is stamped. `migrate.mjs` has a `--target` flag again since 0.6, but it selects this script (read as `3 → 3`) only when the instance's `framework_version` is still on the legacy numbering and the target is too; with a `0.x` stamp or a `0.x` target, as in `sync:upstream` and the doctor's migrate stage, it selects nothing (read from `scripts/migrate.mjs`, not run).
 
 ## What the migration does (mechanically)
 
 `scripts/migrations/v3-to-v3-5-consolidation.mjs` performs:
 
-1. **Seeds `federation.yaml.metadata.genesis_commit`** if missing — derives from `git rev-list --max-parents=0 HEAD | tail -1`. Immutable after seeding.
-2. **Seeds `federation.yaml.metadata.last_sync_commit`** to `null` if missing. Updated to the framework HEAD SHA on first `sync:upstream` run.
+1. **Seeds `federation.yaml.metadata.genesis_commit`** if missing — derives from `git rev-list --max-parents=0 HEAD | tail -1` of the instance. Treat as immutable after seeding.
+2. **Seeds `federation.yaml.metadata.last_sync_commit`** to `null` if missing. Updated to the framework HEAD SHA on the next `sync:upstream` run.
 3. **Adds `lifecycle_status: "dormant"`** to any `data/packages-matrix.yaml` entries missing the field. Operator should review and adjust (active/dormant/planned/retired).
 4. **Logs everything** to `memory/migrations-YYYY-MM-DD.md`.
 
 The migration does **NOT**:
 
-- Force `framework_version` upgrade (operator opts in by editing the field)
+- Change `framework_version` (edit it yourself, or let `npm run doctor sync` re-stamp it)
 - Touch `data/skills-matrix.yaml` (instances own their own; framework's is separate)
 - Modify any skill or package content
 - Delete or rename anything
@@ -73,28 +79,28 @@ If you maintain multiple instances, sequence them by blast radius:
 If sync introduces a regression and you can't fix forward:
 
 1. **Find your snapshot ref:** `git for-each-ref refs/snapshots/` (the snapshot from step 1 above)
-2. **Restore individual files:** `git cat-file -p refs/snapshots/<your-ref>:"<file>" > "<file>"`
-3. **Or restore the whole tree:** see `docs/VAULT-SAFETY.md` recovery runbook
+2. **Restore individual files:** `git cat-file -p refs/snapshots/<your-ref>:"<file>" > "<file>.recovered"`, then compare with the current file before replacing it. A plain `> "<file>"` overwrites silently.
+3. **Or restore more broadly:** see the recovery runbook in [VAULT-SAFETY.md](../VAULT-SAFETY.md)
 
-The migration is additive, so most rollbacks just need a `git revert` of the sync commit.
+The migration is additive, so most rollbacks just need a `git revert` of the commit in which you recorded the sync (`sync:upstream` leaves its changes uncommitted, so there may be none).
 
 ## After successful sync
 
-- Re-run `/initialize` to refresh dashboard
-- Check `npm run check:divergence` — script divergences from canonical are now visible and resolvable per-script
+- Re-run `/initialize` to refresh the dashboard
+- Check `npm run check:divergence` — it lists, advisorily, which of your scripts differ from the framework's
 - Consider enabling pre-commit hooks: `npm run install:hooks`
 - If you want auto-discovery of skills: `npm run generate:skills` writes `SKILLS.md` + `.well-known/skills.json`
 
 ## Known issues
 
 - Pre-existing instance scripts may diverge from framework canonical (intentional or drift). `npm run check:divergence` surfaces these advisorily. Resolution is operator-driven, not automated.
-- `refi-dao-os` has a known divergent `compile-knowledge.mjs` (md5: 73f9b36d…) — manually reconcile during cascade. See `docs/SKILL-PROMOTION.md` Known Divergences table.
+- [SKILL-PROMOTION.md](../SKILL-PROMOTION.md) keeps a "Known divergences" table, written at the v3.5.0 release and not re-checked.
 
 ## References
 
-- `CHANGELOG.md` — full v3.5.0 entry
-- `docs/VERSIONING.md` — versioning policy + lineage stamp + triplet sanity
-- `docs/RELIABILITY.md` — failure modes + trigger layers + recovery
-- `docs/VAULT-SAFETY.md` — vault-safety protocol + 7-layer recovery runbook
-- `docs/PACKAGE-LIFECYCLE.md` — package lifecycle states + sync mechanism
-- `docs/SKILL-PROMOTION.md` — skill + script promotion workflow
+- [CHANGELOG.md](../../CHANGELOG.md) — release history, including the `0.x` re-baseline
+- [VERSIONING.md](../VERSIONING.md) — versioning policy, lineage stamp, version surfaces
+- [RELIABILITY.md](../RELIABILITY.md) — failure modes, trigger layers, recovery
+- [VAULT-SAFETY.md](../VAULT-SAFETY.md) — workspace safety protocol and recovery runbook
+- [PACKAGE-LIFECYCLE.md](../PACKAGE-LIFECYCLE.md) — package lifecycle states and sync mechanism
+- [SKILL-PROMOTION.md](../SKILL-PROMOTION.md) — skill and script promotion workflow

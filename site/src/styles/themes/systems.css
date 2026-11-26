@@ -1,40 +1,39 @@
-/* themes/systems.css — light "technical-editorial" theme (primary).
- * Ink on warm paper, monospace-forward, engineering-schematic atmosphere. */
+/* themes/systems.css — light theme (primary). Ink on warm paper, regen green,
+ * monospace-forward. Flat: colour, hairlines and type carry the page. */
 :root {
   /* Surfaces — warm paper, layered */
-  --color-bg:        #f6f4ed;   /* page — warm paper */
-  --color-bg-2:      #efece2;   /* recessed panel / wells */
-  --color-surface:   #fcfbf6;   /* raised card */
-  --color-surface-2: #f1eee4;   /* code / terminal wells */
+  --color-bg:        #f5eee1;   /* page — warm paper */
+  --color-bg-2:      #ece3d2;   /* recessed panel / wells */
+  --color-surface:   #fbf6ec;   /* raised card */
+  --color-surface-2: #efe7d7;   /* code / terminal wells */
 
-  /* Ink scale */
-  --color-ink:    #14171a;      /* headings, near-black */
-  --color-ink-2:  #353a40;      /* body text */
-  --color-muted:  #5b616a;      /* secondary */
-  --color-faint:  #969aa0;      /* captions, labels, leader lines */
+  /* Ink scale — warm blacks */
+  --color-ink:    #1b1713;      /* headings, near-black */
+  --color-ink-2:  #3b342c;      /* body text */
+  --color-muted:  #62584b;      /* secondary */
+  --color-faint:  #857a6b;      /* leader lines, marks — non-text; 3:1 */
 
   /* Lines */
-  --color-line:   #e2dfd2;      /* hairline borders */
-  --color-line-2: #cdc9b9;      /* stronger rules */
-  --color-grid:   #e8e5d8;      /* atmospheric blueprint grid */
+  --color-line:   #e3d9c6;      /* hairline borders */
+  --color-line-2: #cfc2aa;      /* stronger rules */
 
-  /* Accent — regen green (swappable, spec §16) */
-  --color-accent:      #1c7d3b;
+  /* Accent — regen green */
+  --color-accent:      #176a32;
   --color-accent-soft: #2da856;
-  --color-accent-ink:  #f8f6ef;
-  --color-accent-wash: rgba(28, 125, 59, 0.08);
+  --color-accent-ink:  #fbf6ec;
+  --color-accent-wash: rgba(23, 106, 50, 0.08);
+
+  --color-sun:  #b0650c;                     /* the theme switch's sun — 3:1 on --color-surface-2 */
 
   /* Type */
   --font-display: "Geist Mono Variable", ui-monospace, "SFMono-Regular", monospace;
   --font-mono:    "Geist Mono Variable", ui-monospace, "SFMono-Regular", monospace;
   --font-body:    "Geist Variable", system-ui, sans-serif;
 
-  --radius: 5px;
-  --radius-sm: 3px;
+  --radius: 4px;
+  --radius-sm: 2px;
 
-  /* Elevation — whisper-soft, warm-tinted */
-  --shadow-1: 0 1px 2px rgba(20, 23, 26, 0.04), 0 1px 1px rgba(20, 23, 26, 0.03);
-  --shadow-2: 0 1px 2px rgba(20, 23, 26, 0.04), 0 14px 32px -18px rgba(20, 23, 26, 0.20);
+  --shadow-dialog: 0 1px 2px rgba(60, 40, 20, 0.05), 0 18px 40px -20px rgba(90, 60, 30, 0.26);
 
   color-scheme: light;
 }

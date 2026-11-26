@@ -1,0 +1,200 @@
+---
+// The docs page: sidebar · article · on-page contents.
+//   ≥ 1100px  three columns
+//   ≥ 800px   sidebar and article; contents above the article
+//   < 800px   one column; the sidebar is a disclosure in a bar under the nav
+import Layout from "./Layout.astro";
+import DocsSidebar from "./DocsSidebar.astro";
+import DocsToc from "./DocsToc.astro";
+import DocsFooter from "./DocsFooter.astro";
+import PromptBar from "./PromptBar.astro";
+import { withBase } from "../lib/base";
+import { neighbours } from "../data/docs-manifest.mjs";
+import { sectionById } from "../data/docs-manifest.mjs";
+interface Heading { depth: number; slug: string; text: string; }
+interface Props {
+  page: { source: string; slug: string; title: string; section: string; summary: string; verified: string | null };
+  headings: Heading[];
+}
+const { page, headings } = Astro.props;
+const { prev, next } = neighbours(page.slug);
+---
+<Layout title={page.title} description={page.summary} current="docs">
+  <details class="docs-drawer">
+    <summary class="mono">Documentation menu</summary>
+    <DocsSidebar current={page.slug} idPrefix="drawer" />
+  </details>
+  <div class="container-wide docs-grid">
+    <aside class="docs-side"><DocsSidebar current={page.slug} idPrefix="side" /></aside>
+    <div class="docs-contents"><DocsToc headings={headings} /></div>
+    <div class="docs-main">
+      <article class="doc prose" data-pagefind-body>
+        <nav class="eyebrow trail" aria-label="Breadcrumb" data-pagefind-ignore><a href={withBase("/docs")}>Docs</a><span aria-hidden="true">/</span>{sectionById(page.section).title}</nav>
+        <h1>{page.title}</h1>
+        <slot />
+      </article>
+      <DocsFooter page={page} />
+    </div>
+  </div>
+  <PromptBar slot="prompt" prev={prev ? withBase(`/docs/${prev.slug}`) : undefined} next={next ? withBase(`/docs/${next.slug}`) : undefined} />
+</Layout>
+<script>
+  import { moreTo, HINTS } from "../lib/table-scroll.mjs";
+
+  // The contents list starts open so it works without script; on a narrow
+  // screen it would push the article down, so close it there.
+  const toc = document.querySelector<HTMLDetailsElement>(".docs-toc");
+  if (toc && window.matchMedia("(max-width: 1099px)").matches) toc.open = false;
+
+  // A malformed escape in a hash must not take the rest of this script down.
+  const safeDecode = (s: string) => { try { return decodeURIComponent(s); } catch { return s; } };
+
+  // Scroll-spy: mark the section being read in the contents list.
+  const links = new Map<string, HTMLAnchorElement>();
+  for (const a of document.querySelectorAll<HTMLAnchorElement>(".docs-toc a")) links.set(safeDecode(a.hash.slice(1)), a);
+  const headings = [...links.keys()].map((id) => document.getElementById(id)).filter((h): h is HTMLElement => h !== null);
+  let current: string | undefined;
+  const spy = () => {
+    let id = headings[0]?.id;
+    for (const h of headings) { if (h.getBoundingClientRect().top <= 96) id = h.id; else break; }
+    if (id === current) return;
+    current = id;
+    for (const [key, a] of links) {
+      a.classList.toggle("active", key === id);
+      if (key === id) a.setAttribute("aria-current", "location"); else a.removeAttribute("aria-current");
+    }
+  };
+  if (headings.length > 0) { window.addEventListener("scroll", spy, { passive: true }); spy(); }
+
+  // A copy button on every code block.
+  for (const pre of document.querySelectorAll<HTMLPreElement>(".doc pre")) {
+    const wrap = document.createElement("div");
+    wrap.className = "code-wrap";
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "copy pill";
+    button.setAttribute("aria-label", "Copy code");
+    button.setAttribute("aria-live", "polite");
+    button.textContent = "Copy";
+    button.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(pre.querySelector("code")?.innerText ?? pre.innerText);
+        button.textContent = "Copied";
+      } catch {
+        button.textContent = "Select and copy";
+      }
+      window.setTimeout(() => { button.textContent = "Copy"; }, 1600);
+    });
+    pre.replaceWith(wrap);
+    wrap.append(pre, button);
+  }
+
+  // A table wider than its column scrolls inside its region (built by
+  // src/lib/table-scroll.mjs, so it works without this script). Here: say so in
+  // words above the table and mark the edge that hides more; and where a table
+  // fits, take it out of the Tab order, since there is nothing to scroll. The
+  // words go above the table: a long table's foot is screens away from its head.
+  for (const region of document.querySelectorAll<HTMLElement>(".doc .table-scroll")) {
+    const name = region.getAttribute("aria-label") ?? "Table";
+    const hint = document.createElement("p");
+    hint.className = "table-hint label";
+    hint.setAttribute("aria-hidden", "true");   // the region's name and role already say it
+    hint.hidden = true;
+    region.before(hint);
+    const update = () => {
+      const more = moreTo(region);
+      const scrolls = region.scrollWidth - region.clientWidth > 1;
+      if (scrolls) {
+        region.setAttribute("role", "region"); region.setAttribute("aria-label", name); region.tabIndex = 0;
+      } else {
+        region.removeAttribute("role"); region.removeAttribute("aria-label"); region.removeAttribute("tabindex");
+      }
+      if (more) region.dataset.more = more; else delete region.dataset.more;
+      hint.hidden = !scrolls;
+      if (more) hint.textContent = HINTS[more];
+    };
+    region.addEventListener("scroll", update, { passive: true });
+    new ResizeObserver(update).observe(region);
+    update();
+  }
+
+  // A link mark on each section heading, shown when the heading is touched.
+  for (const h of document.querySelectorAll<HTMLElement>(".doc h2[id], .doc h3[id]")) {
+    const a = document.createElement("a");
+    a.className = "anchor";
+    a.href = `#${h.id}`;
+    a.setAttribute("aria-label", `Link to the section “${h.textContent?.trim()}”`);
+    a.textContent = "#";
+    h.append(a);
+  }
+</script>
+<style>
+.docs-drawer { display: none; }
+.docs-grid {
+  display: grid; gap: var(--space-8); align-items: start; padding-top: var(--space-8);
+  grid-template-columns: 14rem minmax(0, 1fr) 12rem;
+  grid-template-areas: "side main contents";
+}
+.docs-side, .docs-contents { position: sticky; top: calc(var(--nav-height) + var(--space-6)); max-height: calc(100vh - var(--nav-height) - var(--space-8)); overflow-y: auto; }
+.docs-side { grid-area: side; }
+.docs-main { grid-area: main; min-width: 0; }
+.docs-contents { grid-area: contents; }
+
+.doc h1 { margin-top: var(--space-2); }
+.trail { display: flex; gap: var(--space-2); color: var(--color-muted); }
+.trail a { color: inherit; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 0.2em; }
+.trail a:hover { color: var(--color-ink); }
+/* A rule above each h2: a long page shows its structure when scrolled fast. */
+.doc :global(h2) { margin-top: var(--space-10); padding-top: var(--space-5); border-top: var(--border-hair) solid var(--color-line); scroll-margin-top: calc(var(--nav-height) + var(--space-4)); }
+.doc :global(h3) { scroll-margin-top: calc(var(--nav-height) + var(--space-4)); }
+/* A wide table scrolls in its own region, never the page. The region is focusable and named
+   (src/lib/table-scroll.mjs); the edge that hides more is ruled, and the script adds a line of words. */
+.doc :global(.table-scroll) { overflow-x: auto; border-inline: 2px solid transparent; }
+.doc :global(.table-scroll[data-more="right"]), .doc :global(.table-scroll[data-more="both"]) { border-right-color: var(--color-muted); }
+.doc :global(.table-scroll[data-more="left"]), .doc :global(.table-scroll[data-more="both"]) { border-left-color: var(--color-muted); }
+.doc :global(.table-hint) { text-align: right; color: var(--color-muted); }
+.doc :global(.table-hint + .table-scroll) { margin-top: var(--space-1); }
+.doc :global(table) { border-collapse: collapse; font-size: var(--text-sm); line-height: var(--leading-snug); }
+.doc :global(th), .doc :global(td) { border-bottom: var(--border-hair) solid var(--color-line); padding: var(--space-2) var(--space-3) var(--space-2) 0; text-align: left; vertical-align: top; }
+.doc :global(th) { color: var(--color-ink); font-family: var(--font-mono); font-weight: 500; border-bottom-color: var(--color-line-2); white-space: nowrap; }
+.doc :global(blockquote) { border-left: 2px solid var(--color-line-2); padding-left: var(--space-4); color: var(--color-muted); }
+.doc :global(ul), .doc :global(ol) { padding-left: var(--space-5); }
+.doc :global(li + li) { margin-top: var(--space-1); }
+.doc :global(img) { max-width: 100%; height: auto; }
+/* A long path or address in inline code has no place to break, and made the page wider than a phone
+   (six pages at 375px, fourteen at 320px). It may break inside a word. `break-word`, not `anywhere`:
+   it leaves a table's narrowest width alone, so a wide table still scrolls in its region and its
+   commands stay whole. A code block is not touched: it scrolls in its own box.
+   Held by test/page-width.test.mjs; measured by `npm run widths`. */
+.doc :global(:not(pre) > code) { overflow-wrap: break-word; }
+/* added by the script above */
+.doc :global(.code-wrap) { position: relative; }
+.doc :global(.code-wrap .copy) { position: absolute; top: var(--space-2); right: var(--space-2); opacity: 0; transition: opacity var(--t-fast), border-color var(--t-fast), color var(--t-fast); }
+.doc :global(.code-wrap:hover .copy), .doc :global(.code-wrap .copy:focus-visible) { opacity: 1; }
+/* where there is no hover the button is always shown: give the block room so it covers no code */
+@media (hover: none) { .doc :global(.code-wrap .copy) { opacity: 1; } .doc :global(.code-wrap pre) { padding-top: var(--space-10); } }
+.doc :global(.anchor) { margin-left: 0.4em; color: var(--color-muted); opacity: 0; text-decoration: none; transition: opacity var(--t-fast), color var(--t-fast); }
+.doc :global(h2:hover .anchor), .doc :global(h3:hover .anchor), .doc :global(.anchor:focus-visible) { opacity: 1; }
+.doc :global(.anchor:hover) { color: var(--color-accent); }
+@media (hover: none) { .doc :global(.anchor) { display: none; } }
+.doc :global(hr) { border: 0; border-top: var(--border-hair) solid var(--color-line); margin-block: var(--space-8); }
+
+@media (max-width: 1099px) {
+  .docs-grid { grid-template-columns: 14rem minmax(0, 1fr); grid-template-areas: "side contents" "side main"; row-gap: var(--space-5); }
+  .docs-contents { position: static; max-height: none; }
+}
+@media (max-width: 799px) {
+  .docs-side { display: none; }
+  .docs-drawer {
+    display: block;
+    background: var(--color-bg-2); border-bottom: var(--border-hair) solid var(--color-line);
+  }
+  .docs-drawer summary { cursor: pointer; padding: var(--space-3) var(--gutter); font-size: var(--text-sm); color: var(--color-ink);
+    display: flex; justify-content: space-between; align-items: center; list-style: none; }
+  .docs-drawer summary::-webkit-details-marker { display: none; }
+  .docs-drawer summary::after { content: "▾"; color: var(--color-muted); }
+  .docs-drawer[open] summary::after { content: "▴"; }
+  .docs-drawer :global(.docs-sidebar) { padding: var(--space-2) var(--gutter) var(--space-6); }
+  .docs-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "contents" "main"; padding-top: var(--space-5); }
+}
+</style>

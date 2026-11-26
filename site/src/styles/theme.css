@@ -1,3 +1,5 @@
-/* theme.css — the active theme. Swap this single import to retheme the whole site. */
-@import "./themes/systems.css";        /* ACTIVE — light systems (primary) */
-/* @import "./themes/systems-dark.css";   dark variant (Task 3) */
+/* theme.css — both themes are loaded. Light is the default (:root); dark
+ * applies when <html data-theme="dark">, which src/lib/theme-boot.mjs sets
+ * before first paint. To retheme the site, change these two imports. */
+@import "./themes/systems.css";
+@import "./themes/systems-dark.css";

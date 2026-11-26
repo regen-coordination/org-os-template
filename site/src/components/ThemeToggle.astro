@@ -1,0 +1,52 @@
+---
+// A button that switches between the two themes and remembers the choice.
+// Hidden until script runs: without script it could do nothing.
+import { THEME_KEY } from "../lib/theme-boot.mjs";
+---
+<button type="button" class="theme-toggle" aria-pressed="false" aria-label="Dark theme" title="Dark theme" data-key={THEME_KEY} hidden>
+  <span class="track" aria-hidden="true"><span class="orb"></span></span>
+</button>
+<script>
+  const root = document.documentElement;
+  const button = document.querySelector<HTMLButtonElement>(".theme-toggle");
+  const metas = document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]');
+  if (button) {
+    const paint = () => {
+      button.setAttribute("aria-pressed", String(root.dataset.theme === "dark"));
+      // Layout wrote one meta per colour scheme; when the viewer's saved choice
+      // differs from the system setting, make all of them say the shown theme's colour.
+      const bg = getComputedStyle(root).getPropertyValue("--color-bg").trim();
+      for (const meta of metas) meta.content = bg;
+    };
+    button.hidden = false;
+    paint();
+    button.addEventListener("click", () => {
+      root.dataset.theme = root.dataset.theme === "dark" ? "light" : "dark";
+      try { localStorage.setItem(button.dataset.key!, root.dataset.theme); } catch { /* storage blocked: the choice lasts for this page */ }
+      paint();
+    });
+  }
+</script>
+<style>
+.theme-toggle { display: inline-flex; align-items: center; justify-content: center; min-width: 2.75rem; min-height: 2rem; padding: 0; background: none; border: 0; cursor: pointer; border-radius: var(--radius-pill); }
+.track {
+  position: relative; display: block; width: 2.7rem; height: 1.45rem;
+  border: var(--border-hair) solid var(--color-faint); border-radius: var(--radius-pill);
+  background: var(--color-surface-2);
+  transition: border-color var(--t-fast);
+}
+.orb {
+  position: absolute; top: 50%; left: 0.2rem; width: 0.95rem; height: 0.95rem; border-radius: 50%;
+  translate: 0 -50%;
+  background: var(--color-sun);
+  transition: left var(--t-med);
+}
+/* pressed = dark: the knob crosses over and wanes to a crescent, drawn in
+   --color-ink by a disc of the track's colour set over its upper left */
+.theme-toggle[aria-pressed="true"] .orb {
+  left: calc(100% - 1.15rem);
+  background: radial-gradient(circle at 30% 34%, var(--color-surface-2) 0 46%, var(--color-ink) 50%);
+}
+/* The edge only darkens when touched: it keeps its contrast against the page. */
+.theme-toggle:hover .track { border-color: var(--color-ink); }
+</style>

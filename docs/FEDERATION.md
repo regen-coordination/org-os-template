@@ -1,160 +1,71 @@
-# FEDERATION.md — Federation Protocol Specification
+# Federation
 
-Version: 3.0
+An org-os instance is a git repository. Federation, in this repository, means three concrete things: a manifest (`federation.yaml`) in which an instance names its peers, its upstream and its downstream; machine-readable files in `.well-known/` that other tools can fetch; and a handful of scripts that read the manifest. Beyond git and plain HTTPS fetches, the one network protocol is atproto: since 0.7.4 an instance can ask to join a hub's network, and each side publishes its half of the membership link as a record in its own atproto account (see [Joining a network](#joining-a-network)). There is no trust enforcement and no automatic data exchange between instances. This page says what each part does today and, section by section, what is only described and not built.
 
-## Overview
+Status: the manifest, the lineage stamp, `sync:upstream`, `analyze:instances`, the schema generator, the federation map, and joining a network with its link records on atproto (0.7.4, in the admin app) are built. The link records have been tested against a mocked atproto server, not yet run on live accounts (see [Before the live pilot](#before-the-live-pilot)). Knowledge exchange between peers, skill broadcast, trust levels and koi-net sync are not (see [Not built](#not-built)).
 
-Federation enables org-os instances to form networks — sharing knowledge, skills, and coordination across organizational boundaries. A federation is a set of org-os instances (nodes) that declare each other as peers, agree on shared domains, and exchange data through structured protocols.
+Every instance today is run by the maintainer; the federation graph is real files but a single operator's network. The "fork and answer an interview" setup path does not work for a newcomer; cloning with `npm run clone:framework` is the supported route (see [Setup](SETUP.md)).
 
-The federation substrate is **Git**. Every org-os instance is a Git repository. Peers discover each other through `federation.yaml`, exchange knowledge through Git-based mechanisms (PRs, submodules, direct reads), and publish machine-readable schemas in `.well-known/`. For real-time synchronization, instances can optionally layer **koi-net** on top of the Git substrate.
+## federation.yaml
 
-Federation is opt-in, additive, and sovereignty-preserving. Each organization owns its data. Federation adds visibility, not control.
-
----
-
-## federation.yaml v3.0 Specification
-
-The federation manifest is the root configuration file for every org-os instance. It lives at the repository root as `federation.yaml`. All federation behavior derives from this file.
+The manifest lives at the repository root. This repository's own is the working example. Its first lines:
 
 ```yaml
-version: "3.0"
-spec: "organizational-os/3.0"
-```
-
-The `version` and `spec` fields must be present. Parsers use `spec` to determine which schema to validate against.
-
----
-
-### identity
-
-Declares who this instance is.
-
-```yaml
+version: "0.7"
+spec: "organizational-os/0.5"
 identity:
-  name: "ReFi DAO"
-  type: "DAO"
-  emoji: ""
-  daoURI: "https://refidao.com/.well-known/dao.json"
-  chain: "eip155:1"
-  safe: "0x..."
-  hats: null
-  gardens: ""
-  onchain_registration:
-    enabled: false
-    chain: ""
-    contract_address: ""
+  name: "org-os"
+  type: "Project"
 ```
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `name` | string | yes | Human-readable organization name |
-| `type` | enum | yes | One of: `DAO`, `Cooperative`, `Foundation`, `Project`, `LocalNode`, `PersonalNode`, `RegionalNode`, `Hub`, `Network`, `Other` |
-| `emoji` | string | no | Visual identifier for dashboards and canvas layouts |
-| `daoURI` | URL | recommended | Points to the EIP-4824 `dao.json` in `.well-known/` |
-| `chain` | CAIP-2 | no | Primary chain identifier (e.g., `eip155:1` for Ethereum mainnet, `eip155:42220` for Celo) |
-| `safe` | address | no | Gnosis Safe treasury address |
-| `hats` | integer | no | Hats Protocol tree ID for role management |
-| `gardens` | string | no | Gardens DAO contract address or status |
-| `onchain_registration` | object | no | On-chain org registration (chain, contract address, enabled flag) |
-| `scope` | string | no | Optional qualifier for what this node is within its type (e.g., `operational-unit`, `bioregion`, `program`) |
-| `did` | string | no | The org's atproto DID: `did:plc:` and 24 base32 characters, or `did:web:` and a host. The account its link records are written from (see [Link records on atproto](#link-records-on-atproto)). Anything else is ignored, with a warning |
+`version` and `spec` carry the framework's major.minor when `npm run clone:framework` writes them (both from the root `package.json`). On a version bump `scripts/update-version.mjs` rewrites `version` and `metadata.framework_version` but not `spec`, which is why this repository's `spec` still says `0.5`. Older text, including `schemas/federation.yaml`, still says `3.0`; that is the number from before the 2026-06-17 re-baseline and is not what the code writes. No script reads `spec`.
 
-The `type` field determines how other nodes interpret this instance. A `Hub` aggregates peers. A `LocalNode` operates within a geographic scope. A `PersonalNode` is a single person's own instance: their practice, portfolio, or garden, federating as a peer rather than representing a collective. A `DAO` or `Cooperative` has governance on-chain. A `Project` is a focused initiative. A `Foundation` is a supporting entity.
+### What the validators require
 
----
+`npm run validate:structure` also requires `.well-known/dao.json`, `members.json` and `projects.json` once `identity.daoURI` is set (not before: without it nothing is generated), parses every `.well-known/*.json`, and requires `metadata.framework_version`. Its federation check (section 6) fails an instance unless `federation.yaml` has: `identity`, `identity.name`, `identity.type`, at least one of `network` / `peers` / `upstream` / `downstream` (or a legacy `federation:` wrapper key), and an `agent` section. A missing `knowledge-commons` section is a warning only.
 
-### Federation Network
+`npm run validate:schemas` ([`scripts/validate-identity.mjs`](../scripts/validate-identity.mjs)) checks: `identity.name` and `identity.type` equal the `Name` and `Type` lines of `IDENTITY.md`; `metadata.framework_version` is exactly major.minor (`"0.7"`, not `"0.7.5"`); `metadata.genesis_commit` is a 40-hex SHA (missing is a warning, so a first sync can seed it); `metadata.last_sync_commit` is a 40-hex SHA or null. With `identity.daoURI` set it also checks the published `.well-known/` files against their schemas and scans them for withheld values (see the [EIP-4824 guide](EIP4824-GUIDE.md)). `--strict` turns warnings into failures; a directory argument validates another instance.
 
-Declares this instance's position in the network topology.
+Neither validator checks the `type` enum, trust values or any other field value. [`schemas/federation.yaml`](../schemas/federation.yaml) lists enums, but it is a description, not something code loads; and its `agent.runtime` and `upstream.type` lists no longer match the files in use.
 
-```yaml
-network: "regen-coordination"
-hub: "https://github.com/regen-coordination/hub"
-```
+### Field reference
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `network` | string | recommended | Name of the federation network this instance belongs to. Read as one item of `networks` |
-| `hub` | URL | recommended | URL of the hub repository that aggregates network data. Read as one item of `networks` |
+"Read by" names the code that consumes the field. A field with none is documentation for humans and agents only.
 
-An instance in more than one network lists them under `networks` instead. When `networks` is set, `network` and `hub` are ignored.
+**identity**
 
-An older file may keep `network`, `hub`, `networks` or `peers` inside a `federation:` block. They are still read from there when the top level has none of them, and `validate:schemas` asks you to move them to the top level.
+| Field | Meaning | Read by |
+|---|---|---|
+| `name` | Organisation name (required) | validators; schema generator; map |
+| `type` | One of `DAO`, `Cooperative`, `Foundation`, `Project`, `LocalNode`, `PersonalNode`, `RegionalNode`, `Hub`, `Network`, `Other` (required; list from `schemas/federation.yaml`, not enforced) | validators; schema generator (decides the `type` of `dao.json` and `members.json`: `DAO`, `Foundation`, `Person`, `Entity` or `Organization`); map |
+| `scope`, `role` | Free-form qualifier of the node within its type (`role` is used by this repo: `framework-upstream + orchestration-hub`) | nothing |
+| `emoji` | Display glyph | map |
+| `language` | BCP-47 working language; stamped at clone time | agents |
+| `short_description` | One-line description | schema generator (`dao.json` description) |
+| `daoURI` | `https` URL of the instance's `dao.json` | schema generator: every id and URI in `.well-known/` is built from it; if empty, `generate:schemas` writes nothing, and `validate:structure` does not require the `.well-known/` files |
+| `attestation_issuers[]` | `name`, `issuer` | schema generator: `attestation-issuers.json` (DAOIP-3) |
+| `chain`, `safe`, `gardens` | Chain id (CAIP-2), Safe address, Gardens address | schema generator, as a 0.5 fallback only: when `data/systems.yaml` has no on-chain System, `safe` and `gardens` become entries of `contracts.json`, with a warning to move them there |
+| `hats` | Hats Protocol tree id | nothing (a `hats-tree` System in `data/systems.yaml` is what gets published) |
+| `did` | The org's atproto DID: `did:plc:` and 24 base32 characters, or `did:web:` and a host. The account its link records are written from (see [Link records on atproto](#link-records-on-atproto)). Anything else is ignored, with a warning | the admin's Federation page; kms, which checks it equals the `did` under `atproto` in `kms.yaml` |
+| `onchain_registration` | `enabled`, `chain`, `contract_address` | schema generator, as a fallback: the address is listed in `contracts.json` when `data/systems.yaml` has no `daouri-registration` System. Nothing registers anything |
 
-```yaml
-networks:
-  - name: "regen-coordination"
-    hub: "https://github.com/regen-coordination/hub"
-    role: "node"
-  - name: "refi-dao"
-    hub: "https://github.com/refi-dao/hub"
-    role: "node"
-```
+**Network and relations**
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `name` | string | yes | Name of the network |
-| `hub` | URL | recommended | The network's hub repository. `url` is read the same way when there is no `hub` |
-| `role` | string | no | What this instance is in that network, for example `node` or `hub` |
+| Field | Meaning | Read by |
+|---|---|---|
+| `network` | Name of the network | validator (counts as participation); `initialize` dashboard |
+| `hub` | Hub repository, as an `https://` URL | map (self node URL); read as one item of `networks` |
+| `networks[]` | For an instance in more than one network: `name` (required), `hub` (`url` is read the same way when there is no `hub`), `role` (`node`, `hub`…). When set, `network` and `hub` are ignored | the admin's Federation page; schema generator (`federation.json`) |
+| `join` | How others join this instance's network: `policy` (`closed`, `invite`, `open-with-approval`, `open`), `types`, `asks`, `where` (a public `https://` address), `decision` (under `open`). Unknown `policy`: ignored, and `validate:schemas` says so. See [Hosting a network](#hosting-a-network-the-join-policy) | the admin's Federation page; schema generator (`federation.json`) |
+| `peers[]` | `name`, `repo`, `url`, `trust` (`full` / `read` / `read-write` / `none`), and since 0.7.4 `since`, `decision`, `visibility` (`public` by default, or `private`: never published), `relationship` (free-form; only `node`, on a hub, can make a peer a member), `did`, `link` (`memberOf`, `hasMember`, `peerOf`, or `none` to keep the peer off atproto) and `requested`. `repo` is a path relative to this instance or a folder above it, a GitHub `owner/repo`, or a URL | `initialize` (count, table with trust); map (ring 1); frontier fetch; the admin's Federation page (link state, link records) |
+| `upstream[]` | The framework this instance derives from: `id`/`repository`, `url`, `last_sync`, `sync_frequency`, `type`, `relationship` | `sync-upstream` (uses `upstream[0].url`); `initialize`; instance-doctor (compares the declared URL with the git `upstream` remote; reads `type`/`relationship`/`last_sync` as prose pedigree); map; frontier |
+| `downstream[]` | Instances derived from this one: `name`, `id`, `repo`, `url`, `type`, `local_path`, `cloned`, `trust`, `sync_direction`, `note` | map; frontier. `local_path` is how the map finds a sibling checkout to read counts from. `sync_direction` is not read |
 
-### join
+`trust` is stored and displayed, and the admin's federation reader warns on a value outside the list. Nothing enforces it: no script pushes to a `full` peer or refuses a `none` peer; an accepted join writes `trust: read`. `remote_name` in an upstream entry is not read; `sync-upstream` uses a git remote literally named `upstream`.
 
-Says how others can join this instance's network. It is published in `.well-known/federation.json`.
+An older file may keep `network`, `hub`, `networks` or `peers` inside a `federation:` block. They are still read from there when the top level has none of them, and `validate:schemas` asks you to move them to the top level. Asking to join refuses until they are moved.
 
-```yaml
-join:
-  policy: "open-with-approval"
-  types: ["LocalNode", "PersonalNode"]
-  asks: ["who you are", "why you want to join"]
-  where: "https://github.com/org/hub/issues"
-```
-
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `policy` | enum | yes | One of: `closed`, `invite`, `open-with-approval`, `open` |
-| `types` | list | no | Instance types that may join |
-| `asks` | list | no | What a newcomer is asked to say or show |
-| `where` | string | no | Where to ask, as a public `https://` address (an issue tracker, a form). Anything else is not published |
-| `decision` | string | no | Under `open`: the standing decision that accepts a request on arrival (a decision id from your Decided list). Without one, `open` works as `open-with-approval` |
-
-A `join` with an unknown `policy` is ignored, and `validate:schemas` says so.
-
----
-
-### peers
-
-Lists the other org-os instances this node knows about.
-
-```yaml
-peers:
-  - name: "ReFi Barcelona"
-    repo: "03 Libraries/ReFi-Barcelona"
-    url: "https://github.com/org/repo"
-    trust: "read"
-```
-
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `name` | string | yes | Human-readable peer name |
-| `repo` | string | yes | Where the peer lives: a path relative to this instance or to a folder above it (such as `03 Libraries/…` in a vault), a GitHub `owner/repo`, or a URL |
-| `url` | URL | yes | Public URL of the peer |
-| `trust` | enum | yes | One of: `full`, `read`, `read-write`, `none` |
-| `since` | date | no | When the link started |
-| `decision` | string | no | Where the choice to link was recorded (a decision id or a date) |
-| `visibility` | enum | no | `public` (default) or `private`. A `private` peer is never published |
-| `relationship` | string | no | Free-form: what the peer is to this instance (`hub`, `node`, `network-seat`…). Only `node`, on a hub, can make a peer a member (`hasMember`); no other word is mapped to a link |
-| `did` | string | no | The peer's atproto DID (`did:plc:` and 24 base32 characters, or `did:web:` and a host), the `subject` of the record published for it. Set through the migration list, or by **Ask** for the hub when a lookup tied it (see [The migration list](#the-migration-list)). Anything else is ignored, with a warning |
-| `link` | enum | no | The relation the record for this peer states: `memberOf`, `hasMember` or `peerOf`; or `none`, to keep the peer off atproto. Without it the relation is worked out (the hub of one of your `networks` is `memberOf`; on a hub, a `node` with a `decision`, or one mutual by files that names you as its hub, is `hasMember`) |
-| `requested` | string | no | The id of the request you sent this peer, while no decision has come back. **Record it** replaces it with `decision` |
-
-**Trust levels:**
-
-- `full` — Bidirectional sync. This node can push knowledge to the peer, and the peer can push back. Used between tightly coupled organizations.
-- `read` — This node can read the peer's published data but does not push to it. The default for most federations.
-- `read-write` — This node reads the peer's published data and may also send changes to it, but nothing flows back automatically.
-- `none` — Peer is listed for reference but no automated exchange occurs.
-
-#### Link state
+**Link state.**
 
 Whether a link is real depends on both sides, so it is worked out each time from both `federation.yaml` files and never stored. In N0 a peer is in one of four states (joining a network adds `requested`, `left` and atproto records: see [Joining a network](#joining-a-network)):
 
@@ -167,351 +78,57 @@ Whether a link is real depends on both sides, so it is worked out each time from
 
 `npm run validate:schemas` turns `claimed`, `not-an-instance` and `unknown` into warnings, except an `unknown` peer known only by a URL or a GitHub `owner/repo`, which there is no folder to check for. It never fails because of them, except under `--strict`. Nothing in a `peers` list is ever moved or removed for you.
 
----
+**agent**: `runtime`, `workspace`, `skills[]`, `channels[]`, `proactive`, `heartbeat_interval`. Only `runtime` and the length of `skills` are read (`initialize`). The skill list is not checked against `skills/`; to see which skills an instance actually has, run `npm run generate:skills` (see [Skill specification](SKILL-SPECIFICATION.md)).
 
-### upstream
+**knowledge-commons**: `enabled`, `shared-domains[]`, `sync-protocol` (`git` / `koi-net` / `manual`), `publish{meetings,projects,funding}`, `subscribe[]`. Read by `initialize` and the cloud build state for display (enabled flag, protocol, domains). No code publishes or pulls anything because of it. See [Not built](#not-built).
 
-Declares the template or framework repository this instance inherits from.
+**integrations**: grouped lists (`agent_runtimes`, `knowledge_infrastructure`, `meeting_processing`, `publishing`, `grants`) of `name`, `repo`, `url`, `role`. Informational.
 
-```yaml
-upstream:
-  - type: "template"
-    repository: "org-os-template"
-    url: "https://github.com/regen-coordination/org-os-template"
-    relationship: "fork"
-    last_sync: "2026-03-06"
-    sync_frequency: "monthly"
-    remote_name: "upstream"
-```
+**packages**: a map of package id to boolean. `npm run sync:packages` reads it to decide which framework packages to copy into the instance; `initialize` reads it for the dashboard. The ids are those of `data/packages-matrix.yaml` (see [Packages](PACKAGES.md)); this repository's own list is only a framework default for downstream clones.
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `type` | enum | yes | `template` (inherits structure) or `framework` (inherits code + structure) |
-| `repository` | string | yes | Repository name or path |
-| `url` | URL | yes | Public URL |
-| `relationship` | enum | yes | `fork` (direct descendant) or `reference` (uses as guide) |
-| `last_sync` | date | no | ISO date of last upstream merge |
-| `sync_frequency` | string | no | How often to sync: `weekly`, `monthly`, `quarterly` |
-| `remote_name` | string | yes | Git remote name (typically `upstream`) |
+**customizations[]**: `path`, `reason`, `type` (`addition` / `override` / ...), `maintain_on_sync`. `sync-upstream` reads the list, logs how many entries it holds and writes that count into the sync receipt. It does not use the paths to protect anything: the update is `git pull --rebase upstream main`, and git, not this list, decides what survives. Treat the list as a record of intent.
 
-To sync from upstream:
+**governance**, **platforms**: `maintainers[]`, `decision_model`, `proposal_threshold`; `primary`, `deployment`, `domain`, `mirrors[]`. Informational; no code reads them.
+
+**metadata**: `created`, `last_updated`, `framework_version`, `self_hosting_since`, `bootstrap_date`, `bootstrap_operator`, `genesis_commit`, `last_sync_commit`. The last four are the lineage stamp described below.
+
+### What `clone:framework` writes
+
+A new instance's manifest is short: `version`, `spec`, `identity` (`name`, `type`, `short_description`, optional `emoji` and `language`), `network`, `peers: []`, one `upstream` entry (`id: "org-os-template"`, the canonical URL `https://github.com/regen-coordination/org-os-template.git`, `last_sync`), `downstream: []`, `agent` (`runtime: "claude-code"`, `skills`), `packages`, and `metadata` (including `genesis_commit`, `last_sync_commit: null`). Everything else in the reference above you add by hand. A configured upstream URL that is not the canonical repository is replaced and the substitution is logged. Source: [`scripts/clone-framework.mjs`](../scripts/clone-framework.mjs), stage 6.
+
+## The lineage stamp
+
+`metadata.genesis_commit` is the SHA of the framework's first commit at the moment the instance was cloned; `metadata.last_sync_commit` is the framework `HEAD` at the last sync, or `null` if never synced (also correct for the framework itself). Together they let you ask which framework state an instance was born from and how far it has moved since. `npm run validate:schemas` checks their shape; instance-doctor's lineage check reads them and flags instances that claim a pedigree in prose without a SHA.
+
+## Syncing from upstream
+
+Run from inside an instance:
 
 ```bash
-npm run sync:upstream
-# or manually:
-git fetch upstream && git merge upstream/main --no-commit
+npm run sync:upstream -- --dry    # print the stages, change nothing (does not fetch)
+npm run sync:upstream             # fetch, count new commits, print the count, exit 0 having changed nothing
+npm run sync:upstream -- --yes    # do the sync: rebase, migrate, sync packages, validate, stamp
 ```
 
-The `customizations` section (below) controls which files are preserved during upstream sync.
+There is no interactive prompt: without `--yes` the command only reports how many commits it would apply. With no new commits it prints "Already up to date" and exits 0. `--dry` skips the fetch, so it fails with "Could not read upstream/main" if the `upstream` remote was never fetched.
 
----
+The stages ([`scripts/sync-upstream.mjs`](../scripts/sync-upstream.mjs)): refuse on a dirty working tree (take a snapshot first; see [Vault safety](VAULT-SAFETY.md)); refuse if a `.sync-freeze` file exists; read `upstream[0].url` (add the `upstream` remote if missing, fetch it); count new commits on `upstream/main`; `git pull --rebase upstream main`; run `npm run migrate`; run `npm run sync:packages`; run `validate:structure` and `validate:schemas` (a failure stops before the stamp is updated); write `last_sync_commit` and `last_updated` into `federation.yaml` (seeding `genesis_commit` on the first sync); write `memory/sync-YYYY-MM-DD.md`.
 
-### downstream
+This is a rebase onto the framework's history. It works for an instance cloned from the framework so that history is shared. It is not for an instance that shares no history with the framework; those port framework changes deliberately (the overlay path of the [instance doctor](INSTANCE-DOCTOR.md)).
 
-Lists repositories that this instance feeds into. This includes hatched project repos that federate back to the parent organization.
+## Watching your instances: `analyze:instances`
 
-```yaml
-downstream:
-  - name: "Regenerant Catalunya"
-    repo: "03 Libraries/Regenerant-Catalunya"
-    url: "https://regenerant.refibcn.cat"
-    type: "hatched-project"
-  - name: "Grants OS"
-    repo: "luizfernandosg/grants-os"
-    url: "https://github.com/luizfernandosg/grants-os"
-    type: "tool"
-```
+The framework repository keeps `data/instances.yaml`, a registry of every instance it knows (id, type, maturity, `local_path`, declared extra skills and packages). `npm run analyze:instances` (`--json` for JSON on stdout) walks each instance that is cloned beside it and compares what it finds with what is declared: missing `MASTERPLAN.md` or `federation.yaml`, a `framework_version` that differs from the registry, skills or packages not in `data/skills-matrix.yaml` / `data/packages-matrix.yaml`, data registries outside the canonical list. It writes `memory/reports/instances-drift-YYYY-MM-DD.md`. Drift is informational; the exit code stays 0. `npm run check:divergence` is a related advisory check that compares an instance's scripts with the framework's. Individual instances do not need `data/instances.yaml`.
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `name` | string | yes | Human-readable name |
-| `repo` | string | yes | Repository path |
-| `url` | URL | no | Public URL |
-| `type` | string | no | Relationship type: `hatched-project`, `tool`, `node`, `fork` |
+## `.well-known/`
 
-When an idea on the ideation board progresses to `project` status and gets its own repository, that repo should appear in `downstream` with `type: "hatched-project"`.
+Each instance publishes files under `.well-known/` that other tools can fetch over HTTPS. `npm run generate:schemas` writes them from `federation.yaml` `identity`, the `data/*.yaml` registries and the Markdown records in `content/meetings/` and `content/projects/`, through the standards builder in `packages/admin/lib/standards/`. It writes nothing without `identity.daoURI`, and only what `data/visibility.yaml` makes public. The files: `dao.json`, `members.json`, `proposals.json`, `activities.json`, `contracts.json` and `governance.md` (EIP-4824); `grant-pools.json` and `applications.json` (DAOIP-5, when there is a public pool; `applications.json` only in the admin's live copy); `attestation-issuers.json` (DAOIP-3, when `identity.attestation_issuers` names one); and the org-os extras `meetings.json`, `projects.json`, `finances.json`, `ideas.json`, `knowledge.json` and `federation.json`. Which file comes from which record, and how they are checked, is in the [EIP-4824 guide](EIP4824-GUIDE.md). `skills.json` is separate: `npm run generate:skills` writes it from `skills/`.
 
----
+`.well-known/federation.json` publishes this instance's own public claims: its networks, its join terms and the peers it is willing to name. A peer is listed only when its `url` is a public `https:` address and it is not `visibility: private`. Notes, contacts, relationships and local paths are never published, and peers held back are only counted. A network's `hub` and the `join.where` are published the same way: only as a public `https:` address (`github.com/<owner>/<repo>` written without `https://` counts as one). Anything else, such as a local path or a name with no dot like `https://nas/`, is left out, and `validate:schemas` warns about it.
 
-### agent
+An instance does not receive `packages/admin`; `clone:framework` and the instance doctor's sync copy the builder's core into its `scripts/lib/` ([`scripts/lib/standards-vendor.mjs`](../scripts/lib/standards-vendor.mjs)), so it writes the same files. `*.json.template` files sit beside them; `clone:framework` strips the generated files from a new instance and renders its own `dao.json` from the template. A workflow, `.github/workflows/generate-schemas.yml`, regenerates and commits `.well-known/` on pushes that touch `data/`, `content/meetings/`, `content/projects/` or `federation.yaml`, and daily.
 
-Configures the AI agent that operates this workspace.
-
-```yaml
-agent:
-  runtime: "cursor"
-  workspace: "."
-  skills:
-    - meeting-processor
-    - funding-scout
-    - knowledge-curator
-    - capital-flow
-    - schema-generator
-    - heartbeat-monitor
-    - ideation-curator
-    - aggregator-indexer
-    - system-canvas
-  channels:
-    - telegram
-    - github
-    - email
-  proactive: true
-  heartbeat_interval: "1h"
-```
-
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `runtime` | enum | yes | `openclaw`, `cursor`, `claude-code`, `custom`, `none` |
-| `workspace` | path | yes | Root directory for the agent (`.` for repo root) |
-| `skills` | list | yes | Skill identifiers available to this agent. Corresponds to files in `skills/` |
-| `channels` | list | no | Communication channels the agent can use (telegram, github, email, google-meet, forum) |
-| `proactive` | boolean | no | Whether the agent can initiate actions without being prompted |
-| `heartbeat_interval` | duration | no | How often the agent checks `HEARTBEAT.md` and runs health checks |
-
-Skills listed here must exist in the instance's `skills/` directory or be resolvable from the upstream template. See `docs/SKILL-SPECIFICATION.md` for the skill file format.
-
----
-
-### knowledge-commons
-
-Controls knowledge sharing with the federation network.
-
-```yaml
-knowledge-commons:
-  enabled: true
-  shared-domains:
-    - "regenerative-finance"
-    - "local-governance"
-    - "bioregional-finance"
-  sync-protocol: "git"
-  publish:
-    meetings: true
-    projects: true
-    funding: true
-    knowledge: true
-  subscribe:
-    - "regen-coordination"
-    - "refi-dao"
-```
-
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `enabled` | boolean | yes | Master switch for knowledge commons participation |
-| `shared-domains` | list | yes | Topic domains this instance participates in |
-| `sync-protocol` | enum | yes | `git` (pull-based via PRs/reads), `koi-net` (real-time push), `manual` (human-mediated) |
-| `publish` | object | yes | What data types this instance makes available to peers |
-| `subscribe` | list | yes | Peer names (matching `peers[].name` slugified) whose published data this instance consumes |
-
-**Publish fields:**
-
-- `meetings` — Meeting notes and summaries from `data/meetings.yaml`
-- `projects` — Project status and descriptions from `data/projects.yaml`
-- `funding` — Funding rounds and grant data from `data/funding.yaml`
-- `knowledge` — Curated knowledge pages from `knowledge/`
-
-When `enabled: true`, the knowledge-exchange package reads this config to determine what to publish (generate `.well-known/knowledge.json`) and what to pull from peers.
-
----
-
-### integrations
-
-Declares external repositories and tools this instance integrates with.
-
-```yaml
-integrations:
-  agent_runtimes:
-    - name: "openclaw"
-      repo: "organizational-os/openclaw-source"
-      url: "https://github.com/organizational-os/openclaw-source"
-      role: "primary-runtime"
-  knowledge_infrastructure:
-    - name: "koi-net"
-      repo: "organizational-os/koi-net"
-      url: "https://github.com/organizational-os/koi-net"
-      role: "real-time-sync"
-    - name: "koi-net-integration"
-      repo: "organizational-os/koi-net-integration"
-      url: "https://github.com/organizational-os/koi-net-integration"
-      role: "typescript-bridge"
-  publishing:
-    - name: "quartz-refi-template"
-      repo: "organizational-os/quartz-refi-template"
-      url: "https://github.com/organizational-os/quartz-refi-template"
-      role: "documentation-site"
-  grants:
-    - name: "grants-os"
-      repo: "luizfernandosg/grants-os"
-      url: "https://github.com/luizfernandosg/grants-os"
-      role: "grants-platform"
-```
-
-Each integration entry has `name`, `repo`, `url`, and `role`. Group them by function:
-
-| Group | Purpose |
-|-------|---------|
-| `agent_runtimes` | AI agent backends (openclaw, eliza, etc.) |
-| `knowledge_infrastructure` | Sync and indexing layers (koi-net) |
-| `publishing` | Public-facing sites and documentation (quartz, websites) |
-| `grants` | Grant tracking and management platforms |
-
-Integrations are informational and used by the aggregator and system-canvas packages to render the full ecosystem map.
-
----
-
-### packages
-
-Declares which operational packages are enabled for this instance.
-
-```yaml
-packages:
-  knowledge_base: true
-  meetings: true
-  projects: true
-  finances: true
-  coordination: true
-  webapps: true
-  web3: true
-  # v2.0.0 packages
-  ideation_board: true
-  aggregator: true
-  system_canvas: true
-  knowledge_exchange: true
-```
-
-| Package | Description |
-|---------|-------------|
-| `knowledge_base` | Core knowledge management (data/*.yaml, .well-known/) |
-| `meetings` | Meeting processing and schema generation |
-| `projects` | Project tracking |
-| `finances` | Treasury and financial data |
-| `coordination` | Multi-org coordination workflows |
-| `webapps` | Web application deployment |
-| `web3` | On-chain integrations (Safe, Hats, Gardens) |
-| `ideation_board` | Community idea submission and lifecycle (v2.0.0) |
-| `aggregator` | Cross-repo data aggregation from peers (v2.0.0) |
-| `system_canvas` | Visual system map / Obsidian canvas generation (v2.0.0) |
-| `knowledge_exchange` | Structured knowledge publishing and consumption (v2.0.0) |
-
-Set a package to `false` to disable it. The setup wizard (`npm run setup`) toggles these interactively.
-
----
-
-### customizations
-
-Lists files and directories that should be preserved when syncing from upstream.
-
-```yaml
-customizations:
-  - path: "SOUL.md"
-    reason: "Organization-specific values and mission"
-    type: "addition"
-    maintain_on_sync: true
-  - path: "data/"
-    reason: "Operational data"
-    type: "addition"
-    maintain_on_sync: true
-  - path: "skills/"
-    reason: "Organization-specific skills"
-    type: "addition"
-    maintain_on_sync: true
-```
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `path` | string | File or directory path relative to repo root |
-| `reason` | string | Why this customization exists |
-| `type` | enum | `addition` (new file not in upstream), `override` (replaces upstream file), `modification` (extends upstream file) |
-| `maintain_on_sync` | boolean | If `true`, `npm run sync:upstream` will not overwrite this path |
-
-This is critical for upstream sync safety. Without customizations entries, an upstream merge could overwrite organization-specific files.
-
----
-
-### governance
-
-Describes how decisions are made for this instance.
-
-```yaml
-governance:
-  maintainers:
-    - name: "Core Stewards"
-      role: "owner"
-    - name: "Example Maintainer"
-      role: "maintainer"
-  decision_model: "consensus"
-  proposal_threshold: "Consent-based with objection window"
-```
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `maintainers` | list | People or groups with `owner` or `maintainer` role |
-| `decision_model` | enum | `consensus`, `voting`, `hierarchical`, `delegated` |
-| `proposal_threshold` | string | Human-readable description of what's required to approve changes |
-
-The governance section is informational. It tells agents and operators who has authority over the instance and how changes should be proposed.
-
----
-
-### platforms
-
-Where this instance is hosted and deployed.
-
-```yaml
-platforms:
-  primary: "github"
-  deployment: "github-pages"
-  domain: "refibcn.cat"
-  mirrors:
-    - "https://regenerant.refibcn.cat"
-```
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `primary` | string | Primary platform: `github`, `gitlab`, `gitea` |
-| `deployment` | string | Deployment target: `github-pages`, `railway`, `vercel`, `self-hosted` |
-| `domain` | string | Primary domain |
-| `mirrors` | list | Additional URLs where this instance's content is published |
-
----
-
-### metadata
-
-Timestamps and version tracking.
-
-```yaml
-metadata:
-  created: "2026-03-06"
-  last_updated: "2026-03-06"
-  framework_version: "3.0"
-  genesis_commit: "a1b2c3…"      # 40-hex SHA, immutable
-  last_sync_commit: null          # 40-hex SHA or null
-```
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `created` | date | When this federation manifest was first created |
-| `last_updated` | date | Last modification date (refreshed by `sync-upstream`) |
-| `framework_version` | string | org-os framework version this manifest conforms to |
-| `genesis_commit` | string | 40-hex SHA of the instance's first commit — the framework state it was born from. Immutable; seeded at clone time or on first `sync:upstream` |
-| `last_sync_commit` | string \| null | 40-hex SHA of the upstream framework HEAD at the most recent sync. Updated by `npm run sync:upstream`; `null` means never synced — or the framework itself, which is its own upstream |
-
-#### Lineage stamp (`genesis_commit` + `last_sync_commit`)
-
-Together these two fields form the **lineage stamp** (autopoiesis Phase 2,
-Loop C cascade closure). Use cases:
-
-- Audit the framework state an instance was born from vs. its current
-  synced state (`git log genesis_commit..last_sync_commit` on the framework).
-- Detect shared ancestry: two instances with the same `genesis_commit`
-  are forks of the same framework state.
-- Cross-check sync receipts: `last_sync_commit` matches the newest
-  `memory/sync-YYYY-MM-DD.md` receipt written by `sync-upstream`.
-
-Validated by `npm run validate:schemas` (shape: 40-hex SHA / null) and
-`npm run validate:structure` §8b. A missing `genesis_commit` is a warning,
-not an error — `sync-upstream` seeds it on the first sync.
-
----
+Discovery works as follows: a tool that knows an instance's `daoURI` fetches `dao.json`, which links to the other files by URL. The federation map reads `members.json` and `projects.json` from sibling checkouts (counts), not from the network; the public site's build (`site/scripts/aggregate-federation.mjs`) reads sibling instances' the same way, and does not publish this repository's own `.well-known/` (see [Federation map](FEDERATION-MAP.md#how-the-project-site-uses-it)).
 
 ## Joining a network
 
@@ -664,449 +281,62 @@ Running it for real is a separate go, and it needs:
 - `networks` and `peers` at the top level of each `federation.yaml`. An instance that nests them under
   `federation:` is told to move them to the top level, and asking refuses until they are moved.
 
----
+## The federation map
 
-## Federation Roles
-
-Instances in a federation network take on different roles based on their `identity.type` and position in the network topology.
-
-### Hub
-
-The hub is the aggregation point for a federation network. It maintains a registry of all nodes, collects published data from peers, and serves as the coordination surface.
-
-Responsibilities:
-- Maintains `nodes.yaml` — a registry of all known nodes with their status, type, and federation URLs
-- Runs the aggregator package to index data from all peers
-- Publishes a unified `.well-known/` surface covering the entire network
-- Coordinates cross-org initiatives
-
-Each network has one hub node; an instance can be in several networks. The hub URL is declared in every peer's `federation.yaml` under the `hub` field (or in `networks`).
-
-### Peer / Node
-
-A standard org-os instance that participates in a network. Most instances are peers. A peer:
-- Declares the hub in its `federation.yaml`
-- Lists other peers it exchanges knowledge with
-- Publishes its own `.well-known/` schemas
-- Subscribes to relevant domains from other peers
-
-### Resource Library
-
-A specialized node (`type: "Foundation"` or similar) that curates knowledge for consumption by other instances. A resource library:
-- Focuses on the `knowledge_exchange` package
-- Publishes structured knowledge pages in `knowledge/` organized by domain
-- Has a rich `knowledge-manifest.yaml` with collections and export configuration
-- Other instances' aggregators pull from it
-
-### Downstream / Hatched Project
-
-When an idea on an instance's ideation board progresses to its own repository, that repo becomes a downstream node. It:
-- Has its own `federation.yaml` with `upstream` pointing to the parent org
-- Appears in the parent's `downstream` list
-- Can federate back knowledge and status to the parent
-- May be lightweight (fewer packages enabled)
-
----
-
-## Knowledge Exchange Protocol
-
-Knowledge exchange is the primary value of federation. It allows organizations to share curated knowledge across boundaries while maintaining data sovereignty.
-
-### Publishing (producer side)
-
-1. **Create knowledge pages.** Write Markdown files in `knowledge/<domain>/`, where `<domain>` matches a `shared-domains` entry. Example:
-
-   ```
-   knowledge/
-     regenerative-finance/
-       token-engineering-patterns.md
-       impact-measurement-frameworks.md
-     local-governance/
-       cooperative-bylaws-template.md
-   ```
-
-2. **Declare in knowledge-manifest.yaml.** The manifest in `data/knowledge-manifest.yaml` lists collections, their sources, and export configuration:
-
-   ```yaml
-   knowledge-commons:
-     name: "ReFi DAO Knowledge Commons"
-     domains:
-       - regenerative-finance
-       - network-coordination
-     collections:
-       - id: "blog-articles"
-         source: "data/blog-articles.yaml"
-         count: 12
-         last_processed: "2026-04-01"
-       - id: "podcast-episodes"
-         source: "data/podcast-episodes.yaml"
-         count: 8
-         last_processed: "2026-04-01"
-     exports:
-       - domain: "regenerative-finance"
-         subscribers:
-           - "regen-coordination"
-           - "refi-bcn"
-         format: "markdown+yaml"
-         frequency: "weekly"
-   ```
-
-3. **Generate the .well-known/knowledge.json schema.** The knowledge-exchange package reads `knowledge/` and `data/knowledge-manifest.yaml` to produce `.well-known/knowledge.json`:
-
-   ```json
-   {
-     "@context": "https://www.daostar.org/schemas",
-     "type": "KnowledgeCommons",
-     "publisher": "ReFi DAO",
-     "domains": ["regenerative-finance", "network-coordination"],
-     "collections": [
-       { "domain": "regenerative-finance", "pages": 11 }
-     ],
-     "generated": "2026-04-04T23:15:30.214Z"
-   }
-   ```
-
-### Subscribing (consumer side)
-
-1. **Declare subscriptions.** In `federation.yaml`, list peer names under `knowledge-commons.subscribe`.
-
-2. **Resolve peer repos.** The federation-sync module resolves subscription names to peer repository paths using the `peers` list:
-
-   ```js
-   // federation-sync.mjs resolves subscriber → peer repo
-   subscribers: kc.subscribe.map(sub => ({
-     name: sub,
-     repo: peers.find(p => p.name.toLowerCase().includes(sub))?.repo
-   }))
-   ```
-
-3. **Pull knowledge.** Depending on `sync-protocol`:
-   - **git**: Read the peer's `knowledge/` directory and `.well-known/knowledge.json` directly (if repos share a workspace) or via Git submodule / clone.
-   - **koi-net**: Subscribe to the peer's koi-net node for real-time knowledge events. The koi-net integration translates org-os knowledge into KOI protocol RIDs.
-   - **manual**: Human-mediated — operator reviews peer knowledge and copies relevant pages.
-
-### Sync mechanisms in detail
-
-**Git-based sync (default)**
-
-The simplest approach. Works when instances share a Git workspace (monorepo), are submodules, or can be cloned alongside each other.
+The map renders an instance's external world: ring 1 are the instances in `peers`, `upstream` and `downstream` (plus `kms.yaml` knowledge peers); ring 2 are their own peers, one hop out; ring 3 are source systems (`data/source-systems.yaml`, counts from `data/kb/index.json`) and ecosystems (`data/ecosystems.yaml`). Commands are the `org-os-kms` CLI ([`packages/org-os-kms/src/cli.mjs`](../packages/org-os-kms/src/cli.mjs)). There is no root npm script and no `org-os-kms` on your PATH unless the package is installed; run it with node, from the instance root. The instance needs `packages/org-os-kms/` (it arrives through `sync:packages` only if the package is enabled, not verified here):
 
 ```bash
-# If peer is in same workspace:
-ls ../refi-dao-os/knowledge/regenerative-finance/
-
-# If peer is a separate repo:
-git clone https://github.com/org/peer-os /tmp/peer-os
-cp /tmp/peer-os/knowledge/regenerative-finance/*.md knowledge/incoming/
+node packages/org-os-kms/src/cli.mjs federate frontier --dir .          # fetch each listed instance's federation.yaml into data/federation/frontier/
+node packages/org-os-kms/src/cli.mjs render map --dir .                 # write data/kb/map.json
+node packages/org-os-kms/src/cli.mjs render map html --dir .            # write renders/federation-map.html and renders/federation-links.md
 ```
 
-The aggregator package automates this: it reads `federation.yaml`, resolves peer paths, and indexes their published content.
+`federate frontier` (over `peers`, `upstream` and `downstream`) reads an instance's `federation.yaml` from its `local_path` checkout if present, else from `raw.githubusercontent.com/<repo>/HEAD/federation.yaml` with an 8-second timeout. A failure keeps the previous cached snapshot. This is the only code in the repository that fetches a peer's manifest over the network, and the map reads only the cache. The view is the `<federation-map>` web component in [`packages/org-os-federation-map`](../packages/org-os-federation-map/README.md), used on the public site. Design: [federation map design](superpowers/specs/2026-07-19-federation-map-design.md). The page [Federation map](FEDERATION-MAP.md) covers it in full.
 
-**koi-net sync (real-time)**
+The same CLI has `federate add --card <file> --dir .` (registers a knowledge peer into `kms.yaml`, not into `federation.yaml`), `federate check` (fork-compatibility of peer extension files) and `federate contribute --peer <slug> --dir .`, which only returns a draft for a human to approve and never writes to the peer. See the [kms package README](../packages/org-os-kms/README.md).
 
-For organizations that need real-time knowledge propagation. Requires deploying a koi-net node alongside the org-os instance.
+## Hatched projects (a convention)
+
+An idea in `data/ideas.yaml` moves through `surfaced → proposed → approved → developing → hatched → archived` (the header of that file; the process is in [Idea hatching](IDEA-HATCHING.md)). When a hatched project gets its own repository, the convention is to list it in the parent's `downstream` and to give the child an `upstream` entry pointing at the parent. Nothing automates this; it is two edits to two manifests, and the map then draws the edge.
+
+## Reference: minimal federation.yaml
+
+This is the federation.yaml part of what `clone:framework` produces (the clone also writes `metadata.bootstrap_date` and `bootstrap_operator`, and a real `genesis_commit`; both are optional). It satisfies the federation checks of both validators; `validate:structure` also needs the rest of the instance tree:
 
 ```yaml
-# In federation.yaml
-knowledge-commons:
-  sync-protocol: "koi-net"
-```
-
-The koi-net integration package (`packages/knowledge-exchange/`) bridges org-os data to koi-net RIDs. When a knowledge page is created or updated, it emits a koi-net event. Subscribing nodes receive the event and update their local index.
-
-Federation members in koi-net have trust levels (`core`, `trusted`, `public`) that determine access:
-
-| Trust Level | Can Read | Can Write | Rate Limits |
-|-------------|----------|-----------|-------------|
-| `core` | public + federated data | public + federated data | 1000 queries/min |
-| `trusted` | public data | public data | 100 queries/min |
-| `public` | public data | nothing | 10 queries/min |
-
-See `koi-net-integration/network/federation.yaml` for the full koi-net federation configuration including sharing policies, data sovereignty rules, and security settings.
-
----
-
-## Skill Sharing Protocol
-
-Skills are operational capabilities defined as files in `skills/`. Federation enables skill propagation across the network.
-
-### How skills flow
-
-1. **Framework to instance (upstream sync).** The org-os template defines base skills (meeting-processor, funding-scout, knowledge-curator, etc.). When an instance syncs from upstream, it receives new or updated skills unless the `skills/` path is in `customizations` with `maintain_on_sync: true`.
-
-2. **Hub to peers (skill broadcast).** The hub can publish new skills. Peers discover them by reading the hub's `skills/` directory during aggregation. Operators decide whether to adopt the skill by adding it to their `agent.skills` list.
-
-3. **Peer to peer (manual sharing).** An organization develops a custom skill (e.g., `cooperative-ops` for ReFi BCN). Other peers can copy it into their own `skills/` directory and add it to their `agent.skills` list.
-
-### Skill discovery
-
-Skills are listed in `federation.yaml` under `agent.skills`. The aggregator indexes all peer skill lists to build a network-wide skill catalog. This appears in the system canvas as a visual skill map.
-
-### Adding a shared skill
-
-```bash
-# 1. Copy skill from peer
-cp ../refi-bcn-os/skills/cooperative-ops.md skills/
-
-# 2. Add to federation.yaml
-# agent:
-#   skills:
-#     - cooperative-ops
-
-# 3. Validate
-npm run validate:schemas
-```
-
----
-
-## .well-known/ Discovery Convention
-
-Every org-os instance publishes machine-readable JSON schemas in `.well-known/` at the repository root. This follows the EIP-4824 convention for DAO URIs and extends it to cover all org-os data types.
-
-### Standard schemas
-
-| File | Description | Source |
-|------|-------------|--------|
-| `dao.json` | EIP-4824 DAO URI — identity, governance, proposals | `data/members.yaml`, `data/governance.yaml` |
-| `members.json` | Member registry | `data/members.yaml` |
-| `meetings.json` | Meeting records | `data/meetings.yaml` |
-| `projects.json` | Project registry | `data/projects.yaml` |
-| `finances.json` | Treasury and financial data | `data/finances.yaml` |
-| `proposals.json` | Governance proposals | `data/governance.yaml` |
-| `contracts.json` | Smart contract addresses | `data/contracts.yaml` |
-| `activities.json` | Activity feed | Aggregated from other schemas |
-
-### v2.0.0 schemas
-
-| File | Description | Source |
-|------|-------------|--------|
-| `ideas.json` | Ideation board — ideas, proposals, projects | `data/ideas.yaml` |
-| `knowledge.json` | Knowledge commons manifest | `knowledge/`, `data/knowledge-manifest.yaml` |
-
-### Discovery flow
-
-1. An instance declares its `daoURI` in `identity.daoURI` (e.g., `https://refidao.com/.well-known/dao.json`).
-2. A peer or external tool fetches that URL to discover the organization.
-3. The `dao.json` links to other schemas. The peer can then fetch `members.json`, `projects.json`, etc.
-4. For federation specifically, a peer reads `knowledge.json` to discover what knowledge domains are available and how many pages exist.
-
-### federation.json
-
-`.well-known/federation.json` publishes this instance's own public claims: its networks, its join terms and the peers it is willing to name. A peer is listed only when its `url` is a public `https:` address and it is not `visibility: private`. Notes, contacts, relationships and local paths are never published, and peers held back are only counted. A network's `hub` and the `join.where` are published the same way: only as a public `https:` address (`github.com/<owner>/<repo>` written without `https://` counts as one). Anything else, such as a local path or a name with no dot like `https://nas/`, is left out, and `validate:schemas` warns about it.
-
-### Generating schemas
-
-```bash
-npm run generate:schemas    # Reads data/*.yaml, writes .well-known/*.json
-npm run validate:schemas    # Validates all generated schemas
-```
-
-Templates for schemas live in `.well-known/*.json.template`. The schema generator fills them with data from `data/*.yaml` files.
-
-### Schema format
-
-All schemas follow the DAOstar context:
-
-```json
-{
-  "@context": "https://www.daostar.org/schemas",
-  "type": "SchemaType",
-  ...
-  "generated": "2026-04-04T23:15:30.214Z"
-}
-```
-
----
-
-## Hatched Repo Federation
-
-The ideation board package manages an idea lifecycle: `idea` -> `proposal` -> `project` -> `archived`. When an idea reaches `project` status and warrants its own repository, it becomes a **hatched repo**.
-
-### Hatching process
-
-1. An idea in `data/ideas.yaml` reaches `project` status with `linked_project` pointing to a project ID.
-2. The operator creates a new repository for the project. This can be a fresh org-os instance (run `npm run setup`) or a lightweight repo.
-3. The new repo's `federation.yaml` lists the parent org as `upstream`:
-
-   ```yaml
-   upstream:
-     - type: "template"
-       repository: "refi-dao-os"
-       url: "https://github.com/org/refi-dao-os"
-       relationship: "fork"
-       remote_name: "parent"
-   ```
-
-4. The parent org adds the new repo to its `downstream` list:
-
-   ```yaml
-   downstream:
-     - name: "Regenerant Catalunya"
-       repo: "03 Libraries/Regenerant-Catalunya"
-       type: "hatched-project"
-   ```
-
-5. The hatched repo's `.well-known/` schemas are indexed by the parent's aggregator, keeping the parent org informed of the project's progress.
-
-### Federation back to parent
-
-A hatched repo can publish knowledge back to its parent through the standard knowledge exchange protocol. If the parent subscribes to the hatched repo (listed in `knowledge-commons.subscribe`), knowledge flows bidirectionally.
-
-This creates a virtuous cycle: the parent org generates ideas, the best ones hatch into projects, and those projects feed knowledge back into the parent's commons.
-
----
-
-## Configuration Walkthrough
-
-To set up federation for a new org-os instance from scratch:
-
-### 1. Run the setup wizard
-
-```bash
-npm run setup
-```
-
-This interactively configures `federation.yaml` with your identity, network, and package selections.
-
-### 2. Declare your identity
-
-Fill in the `identity` section. At minimum, set `name` and `type`. If you have on-chain governance, add `chain`, `safe`, and `daoURI`.
-
-### 3. Join a network
-
-Look the hub up on the Federation page, answer its asks and send your request. See [Joining a network](#joining-a-network).
-
-### 4. Add peers
-
-List the org-os instances you want to exchange data with under `peers`. Set `trust: "read"` for standard read access.
-
-### 5. Configure knowledge commons
-
-Enable knowledge commons and list your shared domains. Set `publish` flags for the data types you want to share. Add peer names to `subscribe` for data you want to consume.
-
-### 6. Enable packages
-
-Turn on the packages you need. The v2.0.0 packages (`ideation_board`, `aggregator`, `system_canvas`, `knowledge_exchange`) require additional setup — see the package-specific READMEs.
-
-### 7. Generate and validate
-
-```bash
-npm run generate:schemas
-npm run validate:schemas
-```
-
-### 8. Commit and push
-
-Your instance is now federated. Peers can discover you through your `.well-known/` schemas, and you can start exchanging knowledge.
-
----
-
-## Reference: Minimal federation.yaml
-
-A minimal valid federation manifest for a new instance joining an existing network:
-
-```yaml
-version: "3.0"
-spec: "organizational-os/3.0"
-
+version: "0.7"
+spec: "organizational-os/0.7"
 identity:
   name: "My Organization"
   type: "Project"
-
-network: "regen-coordination"
-hub: "https://github.com/regen-coordination/hub"
-
-peers:
-  - name: "Hub"
-    repo: "regen-coordination/hub"
-    url: "https://github.com/regen-coordination/hub"
-    trust: "read"
-
+network: ""
+peers: []
 upstream:
-  - type: "template"
-    repository: "org-os-template"
-    url: "https://github.com/regen-coordination/org-os-template"
-    relationship: "fork"
-    remote_name: "upstream"
-
+  - id: "org-os-template"
+    url: "https://github.com/regen-coordination/org-os-template.git"
+    last_sync: "2026-01-01"
 downstream: []
-
 agent:
-  runtime: "none"
-  workspace: "."
-  skills:
-    - meeting-processor
-    - schema-generator
-  channels: []
-  proactive: false
-  heartbeat_interval: "1h"
-
-knowledge-commons:
-  enabled: false
-  shared-domains: []
-  sync-protocol: "git"
-  publish:
-    meetings: false
-    projects: false
-    funding: false
-  subscribe: []
-
+  runtime: "claude-code"
+  skills: []
 packages:
   knowledge_base: true
-  meetings: false
-  projects: false
-  finances: false
-  coordination: false
-  webapps: false
-  web3: false
-
-customizations:
-  - path: "SOUL.md"
-    reason: "Organization-specific values"
-    type: "addition"
-    maintain_on_sync: true
-  - path: "data/"
-    reason: "Operational data"
-    type: "addition"
-    maintain_on_sync: true
-
-governance:
-  maintainers:
-    - name: "Team"
-      role: "owner"
-  decision_model: "consensus"
-  proposal_threshold: "Consensus required"
-
-platforms:
-  primary: "github"
-  deployment: "github-pages"
-  domain: ""
-  mirrors: []
-
 metadata:
-  created: ""
-  last_updated: ""
-  framework_version: "3.0"
+  framework_version: "0.7"
+  genesis_commit: null
+  last_sync_commit: null
 ```
 
-From here, enable features incrementally as needed.
+(`genesis_commit` null is a warning only; the clone fills in the real SHA.) `IDENTITY.md` must carry matching `- **Name:**` and `- **Type:**` lines or `validate:schemas` fails.
 
-## The Federation Map ("the torch")
+## Not built
 
-Every instance can render an interactive map of its external world — federated
-instances (ring 1), frontier peers-of-peers (ring 2), knowledge sources and
-ecosystems (ring 3) — the counterpart of the internal note graph.
+The earlier version of this page specified the following as a protocol. None of it is implemented; a manifest can declare it, and nothing acts on the declaration.
 
-- **Data:** `org-os-kms render map` → `map.json` (aggregates `federation.yaml`,
-  `kms.yaml` peers, KB source-systems, `data/ecosystems.yaml`, frontier cache).
-- **Frontier:** `org-os-kms federate frontier` fetches each peer's
-  `federation.yaml` (local clone first, raw-GitHub fallback) one hop out into
-  `data/federation/frontier/`. Fetch failures keep the stale cache; builds never break.
-- **View:** `@org-os/federation-map` — `<federation-map>` web component
-  (packages/org-os-federation-map). Embedded on the site (`/federation` + home mini).
-- **Vault:** `org-os-kms render map html` → `renders/federation-map.html`
-  (self-contained, offline) + `renders/federation-links.md` (the map's links, one a node, for the note graph).
-  In `map.json` v1 a node's link is its `portal` key, read from `source-systems.yaml`'s `portal_web` /
-  `portal_vault`; the keys stay until map.json v2. ("Portal" names the house's public site.)
-
-Design spec: `docs/superpowers/specs/2026-07-19-federation-map-design.md`.
+- **Knowledge exchange.** `knowledge-commons.publish` and `subscribe` do not cause anything to be published or pulled. There is no `federation-sync` module and no `knowledge-exchange` package. `.well-known/knowledge.json` is generated, but from `data/knowledge-manifest.yaml` (shape: `knowledge_manifest.domains` and `exchange`), not by scanning `knowledge/`; with no domains declared it is empty. Peers are read by hand (`ls ../peer/knowledge/`) or through the kms export/validate path in the [kms package README](../packages/org-os-kms/README.md).
+- **koi-net sync.** `sync-protocol: koi-net` is an accepted value and nothing more. The bridge code that exists is in `packages/koi-bridge` and `packages/koi-opal-bridge`; their own READMEs say what they do. The trust tiers (`core` / `trusted` / `public`) and rate limits once listed here are not implemented in this repository.
+- **Trust levels** on `peers` (see above).
+- **Skill broadcast.** There is no hub-to-peer skill distribution and no network-wide skill catalogue. An instance copies a skill directory from another and lists it itself; promotion into the framework is in [Skill promotion](SKILL-PROMOTION.md).
+- **Hub aggregation.** No `nodes.yaml`, no aggregator package, no system-canvas package. `data/instances.yaml` plus `analyze:instances` is the framework's own, local, equivalent.
+- **Role enforcement.** "Hub", "peer", "resource library" and "hatched project" are conventions of `identity.type` and of how you fill the lists. The one exception: on a hub, a peer with `relationship: node` can be published as a member (`hasMember`).
+- **`customizations` protection**, **`sync_direction`**, **on-chain registration** (see above).

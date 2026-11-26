@@ -1,4 +1,5 @@
-/* global.css — consumes theme vars only (no raw hex). Technical-editorial base. */
+/* global.css — consumes theme vars only (no raw hex). Flat and tight: every
+ * element either says something or is a way to act (spec 2026-10-11-site-tight-design.md). */
 
 *, *::before, *::after { box-sizing: border-box; }
 * { margin: 0; }
@@ -7,12 +8,6 @@ html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
 
 body {
   background-color: var(--color-bg);
-  /* Atmospheric blueprint grid */
-  background-image:
-    linear-gradient(var(--color-grid) var(--border-hair), transparent var(--border-hair)),
-    linear-gradient(90deg, var(--color-grid) var(--border-hair), transparent var(--border-hair));
-  background-size: var(--grid-size) var(--grid-size);
-  background-position: center top;
   color: var(--color-ink-2);
   font-family: var(--font-body);
   font-size: var(--text-base);
@@ -20,11 +15,6 @@ body {
   font-synthesis: none;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
-}
-/* Fade the grid toward the edges so it reads as atmosphere, not a flat texture */
-body::before {
-  content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
-  background: radial-gradient(125% 85% at 50% -8%, transparent 38%, var(--color-bg) 92%);
 }
 
 main { min-height: 64vh; display: block; }
@@ -38,90 +28,80 @@ h1, h2, h3, h4 {
   letter-spacing: var(--tracking-tight);
   text-wrap: balance;
 }
-h1 { font-size: var(--text-4xl); line-height: var(--leading-display); letter-spacing: var(--tracking-display); }
-h2 { font-size: var(--text-2xl); }
+h1 { font-size: var(--text-2xl); letter-spacing: var(--tracking-display); }
+h2 { font-size: var(--text-xl); }
 h3 { font-size: var(--text-lg); }
 h4 { font-size: var(--text-md); }
 p { text-wrap: pretty; }
 
 a { color: var(--color-accent); text-decoration: none; }
 
-/* Animated underline that draws in on hover (prose + inline links) */
+/* A link is told from the text around it by more than its colour. */
 .link, .prose a {
   color: var(--color-accent);
-  background-image: linear-gradient(currentColor, currentColor);
-  background-position: 0 100%;
-  background-repeat: no-repeat;
-  background-size: 0% var(--border-hair);
-  transition: background-size var(--t-med);
-  padding-bottom: 1px;
+  text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 0.2em;
+  text-decoration-color: color-mix(in srgb, currentColor 40%, transparent);
+  transition: text-decoration-color var(--t-fast), color var(--t-fast);
 }
-.link:hover, .prose a:hover { background-size: 100% var(--border-hair); }
+.link:hover, .prose a:hover { text-decoration-color: currentColor; }
 
 code, pre, .mono { font-family: var(--font-mono); font-feature-settings: "ss01", "cv01"; }
+/* Commands must read exactly as typed: no ligatures, so "--flag" keeps its two hyphens and the space before it. */
+code, pre, kbd { font-variant-ligatures: none; }
 
 ::selection { background: var(--color-accent-wash); color: var(--color-ink); }
 
 :focus-visible {
   outline: 2px solid var(--color-accent);
-  outline-offset: 3px;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 5px var(--color-accent-wash);
   border-radius: var(--radius-sm);
 }
 
 /* ── Shared marks ──────────────────────────────────────────── */
 .eyebrow {
-  display: inline-flex; align-items: center; gap: var(--space-2);
   font-family: var(--font-mono);
   font-size: var(--text-xs);
   letter-spacing: var(--tracking-eyebrow);
   text-transform: uppercase;
   color: var(--color-accent);
 }
-.eyebrow::before {
-  content: ""; width: 1.4em; height: var(--border-hair);
-  background: currentColor; opacity: 0.8;
-}
 .label {
   font-family: var(--font-mono); font-size: var(--text-2xs);
   letter-spacing: var(--tracking-wide); text-transform: uppercase;
-  color: var(--color-faint);
+  color: var(--color-muted);
 }
 .lead { font-size: var(--text-md); color: var(--color-muted); line-height: var(--leading-snug); }
 
 /* ── Layout helpers ────────────────────────────────────────── */
 .container { width: var(--container); margin-inline: auto; }
 .container-wide { width: var(--container-wide); margin-inline: auto; }
+/* A page that is not a doc: its title block starts here. */
+.page-head { padding-top: var(--space-10); }
+.page-head h1 { margin-top: var(--space-2); }
+.page-head .lead { margin-top: var(--space-3); max-width: var(--container-prose); }
 .prose { max-width: var(--container-prose); }
 .prose > * + * { margin-top: var(--space-4); }
 .prose h2 { margin-top: var(--space-10); }
 .prose h3 { margin-top: var(--space-8); }
 
-/* Raised surface w/ corner ticks (engineering-drawing detail) */
+/* A bordered box. Flat: the hairline is the whole of it. */
 .surface {
-  position: relative;
   background: var(--color-surface);
   border: var(--border-hair) solid var(--color-line);
   border-radius: var(--radius);
 }
 
-/* Reusable crop-mark corners — apply .ticked to a positioned box */
-.ticked::before, .ticked::after {
-  content: ""; position: absolute; width: var(--tick); height: var(--tick);
-  border-color: var(--color-line-2); border-style: solid; opacity: 0.9;
-}
-.ticked::before { top: -1px; left: -1px; border-width: var(--border-hair) 0 0 var(--border-hair); }
-.ticked::after  { bottom: -1px; right: -1px; border-width: 0 var(--border-hair) var(--border-hair) 0; }
-
 /* Figure frame + monospace caption */
-.figure { position: relative; background: var(--color-bg-2); border: var(--border-hair) solid var(--color-line); border-radius: var(--radius); }
+.figure { background: var(--color-bg-2); border: var(--border-hair) solid var(--color-line); border-radius: var(--radius); }
 .figcap {
   font-family: var(--font-mono); font-size: var(--text-2xs);
-  letter-spacing: var(--tracking-wide); color: var(--color-faint);
+  letter-spacing: var(--tracking-wide); color: var(--color-muted);
   display: flex; justify-content: space-between; gap: var(--space-4);
   padding: var(--space-3) var(--space-4); border-top: var(--border-hair) dashed var(--color-line);
 }
 
-/* Code / terminal wells */
+/* Code */
 :where(.prose) code, .code-inline {
   font-size: 0.88em; background: var(--color-surface-2);
   border: var(--border-hair) solid var(--color-line);
@@ -129,24 +109,10 @@ code, pre, .mono { font-family: var(--font-mono); font-feature-settings: "ss01",
 }
 :where(.prose) pre {
   background: var(--color-surface-2); border: var(--border-hair) solid var(--color-line);
-  border-radius: var(--radius); padding: var(--space-4) var(--space-5);
+  border-radius: var(--radius); padding: var(--space-3) var(--space-4);
   overflow-x: auto; font-size: var(--text-sm); line-height: 1.6;
 }
 :where(.prose) pre code { background: none; border: 0; padding: 0; font-size: inherit; }
-
-/* ── Motion: staggered page-load reveal ────────────────────── */
-@keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
-.reveal { animation: rise var(--t-slow) both; }
-.stagger > * { animation: rise var(--t-slow) both; }
-.stagger > *:nth-child(1) { animation-delay: 0.02s; }
-.stagger > *:nth-child(2) { animation-delay: 0.10s; }
-.stagger > *:nth-child(3) { animation-delay: 0.18s; }
-.stagger > *:nth-child(4) { animation-delay: 0.26s; }
-.stagger > *:nth-child(5) { animation-delay: 0.34s; }
-.stagger > *:nth-child(6) { animation-delay: 0.42s; }
-@media (prefers-reduced-motion: reduce) {
-  .reveal, .stagger > * { animation: none; }
-}
 
 /* Skip link (a11y) */
 .skip-link {
@@ -157,3 +123,14 @@ code, pre, .mono { font-family: var(--font-mono); font-feature-settings: "ss01",
   transition: top var(--t-fast);
 }
 .skip-link:focus { top: var(--space-4); }
+
+/* .pill — a small rounded control. Touched, its edge and text darken. */
+.pill {
+  display: inline-flex; align-items: center; gap: 0.45em;
+  font-family: var(--font-mono); font-size: var(--text-xs); line-height: 1.2;
+  padding: 0.25rem 0.7rem; color: var(--color-ink-2); cursor: pointer;
+  border: var(--border-hair) solid var(--color-line-2); border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  transition: border-color var(--t-fast), color var(--t-fast);
+}
+.pill:hover { border-color: var(--color-ink); color: var(--color-ink); }
