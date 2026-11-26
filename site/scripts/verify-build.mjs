@@ -15,6 +15,10 @@ import { registryGuard, findLeaks, longestSharedRun, visibleText, instanceLine, 
 import { tablesOutsideRegion } from "../src/lib/table-scroll.mjs";
 import { idsIn, fragmentOf, fragmentVerdict, stripCode, fragmentCoverage } from "../src/lib/fragments.mjs";
 
+// A long report into a pipe: Node writes a pipe asynchronously, and a process that ends (process.exit below, or a
+// throw on a missing dist/) drops what the pipe has not yet taken. Blocking writes keep every line.
+for (const stream of [process.stdout, process.stderr]) stream._handle?.setBlocking?.(true);
+
 const DIST = "dist";
 let failed = false;
 const fail = (message) => { console.error(message); failed = true; };

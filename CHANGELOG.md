@@ -53,6 +53,9 @@ upgrade unless such an instance relied on drafts going out (*Upgrading*).
   unchanged.
 - **`npm run drift` in `site/` prints its whole report into a pipe.** `process.exit` cut it at the first
   64 KB.
+- **`npm run verify` in `site/` prints its whole report into a pipe too.** Its output is written blocking, so
+  a run that ends early no longer loses the lines a pipe had not yet taken (a site test read them and failed
+  on a slow runner).
 
 ### Upgrading
 
