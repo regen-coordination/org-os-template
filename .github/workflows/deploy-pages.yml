@@ -30,7 +30,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
+      # Full history: the site's verify-build looks up each doc's `verified`
+      # commit (site/src/data/docs-manifest.mjs). A shallow clone has one
+      # commit and would fail every page.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -50,14 +55,6 @@ jobs:
       # Order matters: the site imports ../../packages/org-os-kms, whose own
       # transitive deps (js-yaml) resolve upward into the root install.
       - name: Install root dependencies
-        run: npm ci
-
-      # The <federation-map> client bundle imports d3-force, which is declared
-      # only in packages/org-os-federation-map. Without this the client build
-      # dies with "Rollup failed to resolve import d3-force" — verified against
-      # a sibling-free clone, which is exactly what a runner is.
-      - name: Install federation-map dependencies
-        working-directory: packages/org-os-federation-map
         run: npm ci
 
       - name: Install site dependencies

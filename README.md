@@ -2,7 +2,7 @@
 
 > Framework + standards + orchestration hub.
 
-**Type:** Framework + orchestration hub · **Version:** 0.5.0 · **Status:** active
+**Type:** Framework + orchestration hub · **Version:** 0.7.5 · **Status:** active
 
 **Site:** <https://regen-coordination.github.io/org-os-template/>
 
@@ -15,7 +15,7 @@ git-native workspace where an org's knowledge, data, and operations live as file
 read, act on, and federate.
 
 Clone the framework and configure your org, and it has a brain: identity and values agents
-actually follow, structured data registries, session memory, 35 operational
+actually follow, structured data registries, session memory, 36 operational
 skills, machine-readable schemas, and a federation protocol connecting you to a network of peer
 orgs (single-operator dogfood; external pilot is the open milestone). The config-driven cloning
 engine that does this is shipped and tested — it produced a real instance, bread-coop-os. No
@@ -42,11 +42,36 @@ of inventing its own.
 - **Run a session.** `/initialize` renders a dashboard from live data — projects, tasks,
   calendar, funding deadlines, federation status. `/close` writes memory and commits.
 - **Keep organizational memory.** Daily logs, an indexed long-term memory, and an append-only
-  decision record. Greppable, versioned, agent-readable.
+  decision record. Greppable, versioned, agent-readable. Memory only the Council may read goes to
+  the running Hub instead of git (`npm run memory`).
+- **Run the Hub.** `packages/admin` is a web app for an instance: its records, the rules that
+  decide changes, proposals, boards, outside systems, and the workspace (pages, collections,
+  tasks, comments). A change to the instance's files is a git commit. Run it on your own machine
+  (`npm run admin -- --repo <instance>`, or from the launcher, `npm run open`), or host it for
+  members from one container image ([`deploy/hub/`](deploy/hub/RAILWAY.md)). A hosted Hub writes
+  nothing to its instance until writes are turned on; it reads the instance and follows its remote.
+  See [`docs/ADMIN-APP.md`](docs/ADMIN-APP.md).
+- **Sign members in.** By an emailed link; with a Bluesky or Certified account (identity only,
+  since 0.7.5; on a hosted Hub it is off until the operator sets its key); or with a wallet when the
+  org names a Hats tree. A person's Roles decide what they read.
+- **Keep what is private out of git.** `data/visibility.yaml` says what is public. Anything
+  stricter than members lives in the Hub's private store, outside the repository, with sealed
+  backups. Since 0.7.2 its optional `files:` section says which Roles read which `data/**` files
+  whole.
 - **Publish machine-readable org data.** EIP-4824/DAOstar `.well-known/` descriptors generated
-  from your registries — extended with meetings, projects, finances, and skills.
-- **Federate.** Publish schemas, subscribe to peers, share skills, keep sovereignty. Drift
-  analysis and pull-based migrations mean the framework never breaks downstream.
+  from your registries — extended with meetings, projects, finances, ideas and federation. Only
+  what `data/visibility.yaml` makes public, and only once `identity.daoURI` is set.
+- **Federate.** Declare peers, upstream and downstream in `federation.yaml`; keep instances
+  current with `npm run doctor -- sync` and see their drift with `npm run analyze:instances`.
+  Since 0.7.4 an instance can ask to join a hub's network from the Federation page of a Hub on a
+  member's own machine (those routes are off on a hosted Hub), and each side publishes its half of the link as a record in its own atproto account. That has been tested
+  against a mocked atproto server, not yet run on live accounts, and the network's record type is
+  a placeholder that a live account refuses. Knowledge exchange between peers, skill sharing and
+  trust enforcement are not built ([`docs/FEDERATION.md`](docs/FEDERATION.md#not-built)).
+- **Keep a knowledge commons.** `packages/org-os-kms` keeps the org's knowledge as typed
+  objects, publishes the public ones (as JSON, readable pages and, opt-in, atproto records), and
+  draws the federation map. The Hub's knowledge pages (`/c/knowledge`) work on a member's own
+  machine; the hosted image does not carry kms. See [`docs/KMS.md`](docs/KMS.md).
 - **Work from a browser or a chat.** The Cloudflare OS module puts the dashboard and an
   org-literate agent in a workspace, so members who will never touch git can still read the org
   and submit to it.
@@ -56,6 +81,9 @@ of inventing its own.
 ### You're an **operator** spinning up a new org
 
 ```bash
+# Once, in this checkout: install exactly what the lockfiles say
+npm ci && npm ci --prefix packages/admin
+
 # The one recommended path
 node scripts/clone-framework.mjs --target ../my-new-org --config config.yaml
 
@@ -64,29 +92,34 @@ npm run doctor -- --dir ../my-new-org
 ```
 
 A fresh instance should report **no blockers except `git-remote-absent`** — expected until you
-create a repository for it. Anything else is a bug, and `tests/clone-framework-health.test.mjs`
-fails the build if it reappears. That guard exists because until 2026-08-28 this path produced an
-instance with 7 blockers seconds after creation, the worst being that it published *the
-framework's* identity as its own.
+create a repository for it (the doctor exits 1 because of it) — and six warnings that are normal
+on day one; [`docs/SETUP.md`](docs/SETUP.md) lists them and walks every step. Anything else is a
+bug, and `tests/clone-framework-health.test.mjs` fails the build if it reappears.
+
+Last clean-room run: 2026-11-25, on commit `caaeedf8` of the 0.7.5 docs branch. A fresh clone of
+this repository in an empty temporary folder, `npm ci` in it and in `packages/admin`, the clone
+above with a minimal config for an invented organisation, `npm ci`, `validate:schemas` and
+`validate:structure` in the new instance (both passed, with 6 and 7 warnings), then the doctor:
+1 blocker (`git-remote-absent`) and 6 warnings (`never-synced`, `migrations-dir-missing`,
+`structure-warnings`, `schemas-warnings`, `memory-absent`, `no-sync-receipts`). `npm run open`
+built the Hub and served its launcher page at `http://localhost:4679/launch`. That run found that
+`npm install` rewrites the lockfile's header and leaves the instance dirty; the steps above now
+say `npm ci`.
 
 Driving this with an AI agent (Claude Code, Cursor, a ChatGPT connector) is the normal case —
 [`docs/ADOPT-WITH-AN-AGENT.md`](docs/ADOPT-WITH-AN-AGENT.md) is the copy-paste recipe, and
 `BOOTSTRAP.md` has the config template plus the full first-run sequence.
 
 The in-place alternative (`npm run setup`) converts a fork you have already made. It is an
-interactive **TTY-only** wizard — agents and CI shells cannot drive it — asking nine prompts:
-org type · name · description · base URL · packages · agent runtime · network · emoji · Notion.
-A 2026-08-21 clean-room test found the newcomer path through it broken in 7 Blocker-level ways —
-including leaving the fork's own identity and data in place while both validation commands
-reported a full pass. Some of those causes are fixed by the cloning-engine work above; the wizard
-itself has not been re-tested end to end, so prefer the clone. Evidence:
+interactive **TTY-only** wizard — agents and CI shells cannot drive it — and it has not been
+re-tested end to end since a test on 2026-08-21 found it broken, so prefer the clone. Evidence:
 `memory/reports/clean-room-bootstrap-2026-08-21.md`.
 
 ### You're a **contributor** to the framework
 
 ```bash
 git clone <this-repo> && cd <repo>
-npm install
+npm ci
 npm run install:hooks    # pre-commit + advisory hooks
 npm run selftest         # full reliability check
 ```
@@ -113,19 +146,17 @@ Start with `SOUL.md` (mission and values), `IDENTITY.md` (what we are), then
 
 
 
-- **refi-bcn-os** (LocalNode) — unknown
+- **refi-bcn-os** (LocalNode) — production
 
-- **refi-dao-os** (DAO) — unknown
+- **refi-dao-os** (DAO) — production
 
-- **dao-os** (Project) — unknown
+- **dao-os** (Project) — beta
 
-- **openclaw** (AgentRuntime) — unknown
+- **regen-coordination-os** (Hub) — beta
 
-- **regen-coordination-os** (Hub) — unknown
+- **refi-med-os** (LocalNode) — alpha
 
-- **refi-med-os** (LocalNode) — unknown
-
-- **bread-coop-os** (Cooperative) — unknown
+- **regen-toolkit** (Project) — beta
 
 
 
@@ -149,8 +180,8 @@ current drift state.
 | `/skills` | List skills across workspace + user + plugin sources |
 
 
-- **Skills:** 35 total — see `SKILLS.md` and `data/skills-matrix.yaml`
-- **Packages:** 24 total — see `data/packages-matrix.yaml` + `docs/PACKAGE-LIFECYCLE.md`
+- **Skills:** 36 total — see `SKILLS.md` and `data/skills-matrix.yaml`
+- **Packages:** 27 total — see `data/packages-matrix.yaml` + `docs/PACKAGE-LIFECYCLE.md`
 - **Modules:** see [`docs/MODULES.md`](docs/MODULES.md) and `modules/`
 
 ## Documentation
@@ -158,7 +189,7 @@ current drift state.
 
 - [Architecture](docs/ARCHITECTURE.md) — How an instance is put together
 
-- [Modules](docs/MODULES.md) — The v0.5 catalog — what ships, what's planned
+- [Modules](docs/MODULES.md) — The module catalog — what ships, what's planned
 
 - [Federation](docs/FEDERATION.md) — Peers, trust levels, lineage, drift
 
@@ -183,7 +214,7 @@ current drift state.
 
 ## Requirements
 
-- Node ≥22
+- Node ≥22.13
 - npm ≥10.9.2
 - git
 

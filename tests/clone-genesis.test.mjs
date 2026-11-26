@@ -359,8 +359,26 @@ test("docs/ in a clone no longer points at docs/agent-plans/", () => {
     assert.deepEqual(offenders, []);
     assert.match(readFileSync(path.join(dir, "docs", "PLANS.md"), "utf-8"), /docs\/plans\//);
   });
-  // The framework's own copy is untouched.
-  assert.match(readFileSync(path.join(rootDir, "docs", "PLANS.md"), "utf-8"), /docs\/agent-plans\//);
+  // The framework's own copy is untouched: the session commands carry the literal path, which is
+  // what the clone's rewrite acts on (the clone-side assertion above proves it ran).
+  assert.match(readFileSync(path.join(rootDir, ".claude", "commands", "close.md"), "utf-8"), /docs\/agent-plans\//);
+});
+
+test("pages that contrast the framework's plans folder with the instance's read the same in both trees", () => {
+  // The rewrite replaces the literal framework path wherever it finds it. A page that mentioned
+  // it to say "the framework keeps plans here, an instance keeps them there" would read, in a
+  // clone, as if both were docs/plans/. These pages name the framework's folder without the literal.
+  const pages = ["OVERVIEW.md", "FILE-STRUCTURE.md", "HOST-INTEGRATION.md", "PLANS.md", "VERSIONING.md", "MODULES.md"];
+  for (const page of pages) {
+    assert.doesNotMatch(readFileSync(path.join(rootDir, "docs", page), "utf-8"), /docs\/agent-plans\//, `docs/${page} in the framework`);
+  }
+  withClone((dir) => {
+    for (const page of pages) {
+      const body = readFileSync(path.join(dir, "docs", page), "utf-8");
+      assert.equal(body, readFileSync(path.join(rootDir, "docs", page), "utf-8"), `docs/${page} is unchanged by the rewrite`);
+    }
+    assert.doesNotMatch(readFileSync(path.join(dir, "docs", "OVERVIEW.md"), "utf-8"), /keeps them in \`docs\/plans\//);
+  });
 });
 
 test("no npm script in a clone cd's or --prefix'es into a directory the clone lacks", () => {

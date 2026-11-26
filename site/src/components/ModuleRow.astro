@@ -1,0 +1,37 @@
+---
+// One module, as one row of the catalog list: id, name and what it is, status, link.
+import StatusBadge from "./StatusBadge.astro";
+import { withBase } from "../lib/base";
+interface Props { id: string; name: string; status: "planned" | "in-dev" | "pilot" | "live"; summary: string; link: string | null; }
+const { id, name, status, summary, link } = Astro.props;
+---
+<li class="module" data-status={status}>
+  <span class="id mono">{id}</span>
+  <div class="what">
+    <h2 class="name">{name}</h2>
+    <p class="summary">{summary}</p>
+  </div>
+  <span class="status"><StatusBadge status={status} /></span>
+  {link
+    ? <a class="more mono link" href={withBase(link)} aria-label={`${name}: learn more`}>learn more</a>
+    : <span class="more mono muted">spec pending</span>}
+</li>
+<style>
+.module {
+  display: grid; grid-template-columns: 11rem minmax(0, 1fr) 5.5rem 6.5rem; column-gap: var(--space-5);
+  align-items: baseline; padding-block: var(--space-3);
+  border-bottom: var(--border-hair) solid var(--color-line);
+}
+.id { font-size: var(--text-xs); color: var(--color-muted); overflow-wrap: anywhere; }
+.name { font-size: var(--text-base); letter-spacing: 0; }
+.summary { margin-top: 0.15rem; font-size: var(--text-sm); color: var(--color-muted); line-height: var(--leading-snug); max-width: 64ch; }
+.more { font-size: var(--text-sm); text-align: right; }
+.more.muted { color: var(--color-muted); }
+@media (max-width: 760px) {
+  .module { grid-template-columns: minmax(0, 1fr) auto; row-gap: var(--space-1); }
+  .id { grid-column: 1; grid-row: 1; }
+  .status { grid-column: 2; grid-row: 1; }
+  .what { grid-column: 1 / -1; }
+  .more { grid-column: 1 / -1; text-align: left; }
+}
+</style>

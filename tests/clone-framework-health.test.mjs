@@ -86,6 +86,7 @@ test('the clone publishes its OWN identity, not the framework\'s', () => {
     assert.ok(dao['@context'], 'dao.json must keep its EIP-4824 @context');
     const raw = readFileSync(daoPath, 'utf-8');
     assert.ok(!raw.includes('organizational-os.github.io'), 'framework URIs must not leak into the instance');
+    assert.ok(!raw.includes('regen-coordination/org-os-template'), 'framework URIs must not leak into the instance');
     assert.ok(!/"name":\s*"org-os"/.test(raw), 'the framework name must not leak into the instance');
   });
 });

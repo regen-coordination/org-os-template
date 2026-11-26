@@ -19,6 +19,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import yaml from "js-yaml";
 import { render } from "../templates/render.mjs";
+import { downstreamList } from "./lib/readme-downstream.mjs";
 import { SITE_URL } from "../site/base.config.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -37,10 +38,10 @@ const instancesYaml = yaml.load(readFileSync(path.join(rootDir, "data", "instanc
 // `readdirSync().sort().slice(0, 12)`. The old alphabetical slice produced entries with
 // empty blurbs ("— " and nothing after it) and silently truncated anything past the
 // twelfth filename, which is why docs/MODULES.md could never appear. Mirrors the site's
-// curated set in site/src/data/docs-allowlist.ts; keep the two in step.
+// curated set in site/src/data/docs-manifest.mjs; keep the two in step.
 const DOC_SPINE = [
   { file: "ARCHITECTURE.md", title: "Architecture", blurb: "How an instance is put together" },
-  { file: "MODULES.md", title: "Modules", blurb: "The v0.5 catalog — what ships, what's planned" },
+  { file: "MODULES.md", title: "Modules", blurb: "The module catalog — what ships, what's planned" },
   { file: "FEDERATION.md", title: "Federation", blurb: "Peers, trust levels, lineage, drift" },
   { file: "DATA-MODEL.md", title: "Data Model", blurb: "The registries and their cross-references" },
   { file: "EIP4824-GUIDE.md", title: "EIP-4824 Guide", blurb: "Machine-readable org schemas, generated from your data" },
@@ -78,11 +79,7 @@ const data = {
   federation: {
     network: fed.network || "",
     peers: (fed.peers || []).map((p) => (typeof p === "string" ? p : p.id || p.name)).filter(Boolean),
-    downstream: (instancesYaml.instances || []).map((i) => ({
-      name: i.id || i.name,
-      type: i.type || "instance",
-      status: i.status || "unknown",
-    })),
+    downstream: downstreamList(instancesYaml),
   },
   counts: {
     // data/skills-matrix.yaml also carries unpromoted candidates (DAO-module skills

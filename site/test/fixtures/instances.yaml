@@ -23,6 +23,7 @@ instances:
     framework_version: "3.0"
     packages: []
     drift: []
+    listed: true
     notes: "The hub."
   - id: "missing-instance"
     name: "Missing Instance"
@@ -36,3 +37,16 @@ instances:
     packages: []
     drift: ["no_masterplan"]
     notes: "Local path absent — must degrade gracefully."
+  - id: "unlisted-instance"
+    name: "Unlisted Instance"
+    type: "Cooperative"
+    maturity: "production"
+    repo: "https://example.com/unlisted"
+    local_path: "./unlisted-instance"
+    federation_network: "refi-dao"
+    federation_role: "spoke"
+    framework_version: "3.0"
+    packages: []
+    drift: []
+    listed: false
+    notes: "A test fixture, kept off the public list."

@@ -1,437 +1,141 @@
-# AGENTIC-ARCHITECTURE.md — Agent Operating Model
+# Agentic architecture
 
-Version: 2.0.0
+An org-os workspace is built to be operated by an AI agent working alongside a human operator. The agent has no special interface: it reads the repository's files, runs `npm run` scripts, and writes files back. This page says which files an agent reads, in what order, what it may change on its own, what skills and personas it has, and what is not built.
 
-## Overview
+For the layers of the whole framework see [Architecture](ARCHITECTURE.md); for a map of an instance's files see [Overview](OVERVIEW.md).
 
-org-os is an agent-native operating system. Every workspace is designed to be operated by AI agents working alongside human operators. This document specifies how agents interact with the workspace, how they bootstrap into a new organization, and how they autonomously improve the workspace over time.
+**Honest scope.** Every instance today is operated by the maintainer, so the operating model here is one operator's practice, not a pattern tested across independent organisations. The walkup setup (fork the repository, run `npm run setup`, answer an interview in place) does not work for a newcomer; the clone (`npm run clone:framework`) is the supported route (see [Setup](SETUP.md)).
 
-## Agent File Set
+## The startup sequence
 
-Every org-os instance contains these files that agents read on startup. Together they form the agent's complete understanding of the organization.
-
-### Startup Sequence (9 Steps)
+`AGENTS.md` is the authority; it numbers ten steps. At the start of every session the agent reads, in order:
 
 ```
-1. MASTERPLAN.md    → Strategic vision, activations, research directions
-2. SOUL.md          → Mission, values, voice, boundaries
-3. IDENTITY.md      → Org identity, governance, chain addresses
-4. USER.md          → Operator profile, preferences, autonomy level
-5. MEMORY.md        → Key decisions index (long-term)
-6. memory/*.md      → Recent daily logs (last 3-7 days)
-7. HEARTBEAT.md     → Active tasks, urgency, health checks
-8. TOOLS.md         → Endpoints, APIs, Notion IDs, credential refs
-9. federation.yaml  → Network peers, agent config, knowledge commons
+1.  MASTERPLAN.md          mandate, activations, operating context
+2.  SOUL.md                mission, values, voice
+3.  IDENTITY.md            org name, type, chain addresses, network
+4.  USER.md                operator profile and preferences
+5.  MEMORY.md              long-term memory index
+6.  memory/YYYY-MM-DD.md   latest daily log (today's if it exists)
+7.  HEARTBEAT.md           active tasks and monitoring items
+8.  TOOLS.md               endpoints, channels, local configuration
+9.  federation.yaml        network, peers, integrations
+10. parity check           npm run validate:schemas
 ```
 
-After reading all files, the agent validates schemas (`npm run validate:schemas`) and is ready to operate.
+On a first-ever session the agent runs `BOOTSTRAP.md` instead. `npm run initialize` (or `/initialize` in a host) reads the same state and renders it as a dashboard; `dashboard.yaml` chooses the sections. `/close` ends a session: it writes memory, updates `HEARTBEAT.md` and commits. Since 0.7 it asks of each memory entry whether it is for members or for the Council (below). `/initialize` is backed by the `initialize` skill and `/close` by the `org-os-init` skill, which covers the full session lifecycle (see [Commands](COMMANDS.md)).
 
-### File Roles
+### Who writes what
 
-| File            | Written by | Read by | Update frequency     |
-| --------------- | ---------- | ------- | -------------------- |
-| MASTERPLAN.md   | Human      | Agent   | Weekly/monthly       |
-| SOUL.md         | Human      | Agent   | Rarely               |
-| IDENTITY.md     | Human      | Agent   | Rarely               |
-| USER.md         | Human      | Agent   | Rarely               |
-| MEMORY.md       | Both       | Agent   | Per session          |
-| memory/\*.md    | Agent      | Agent   | Daily                |
-| HEARTBEAT.md    | Both       | Agent   | Per session          |
-| TOOLS.md        | Human      | Agent   | When config changes  |
-| CLAUDE.md       | Human      | Agent   | Rarely               |
-| federation.yaml | Human      | Agent   | When network changes |
+| File | Agent may edit without approval? | Source |
+|---|---|---|
+| `memory/YYYY-MM-DD.md` | yes, append only | `AGENTS.md` sections 2 and 6 |
+| `MEMORY.md`, `HEARTBEAT.md` | yes | `AGENTS.md` section 6 |
+| `packages/operations/` meeting notes and project pages | yes | `AGENTS.md` section 6 |
+| `IDENTITY.md`, `SOUL.md`, `AGENTS.md` | no, operator approval | `AGENTS.md` section 6 |
+| `federation.yaml` peers and network relationships | no, operator approval to add or remove | `AGENTS.md` section 6 |
+| Council memory (an entry only some may read) | yes, through the running Hub only, never in `memory/`, `MEMORY.md`, `HEARTBEAT.md`, a plan or a commit message | `.claude/commands/close.md` step 2 |
+| `MASTERPLAN.md`, `USER.md`, `TOOLS.md`, `data/*.yaml` | not named in `AGENTS.md`; by convention operator-owned, edited by an agent when the task calls for it | |
 
-**Key principle:** Human-controlled files (SOUL, IDENTITY, MASTERPLAN) set direction. Agent-controlled files (memory/, HEARTBEAT updates) track execution. MEMORY.md is shared — agents log, humans curate.
+Human-owned files set direction (`MASTERPLAN.md`, `SOUL.md`, `IDENTITY.md`); agent-owned files record execution (`memory/`, `HEARTBEAT.md`). `MEMORY.md` is shared: agents log, humans curate. When it is unclear whether something is allowed, `AGENTS.md` says to draft and present rather than execute. (`AGENTS.md` also lists "maintain federation.yaml peer references" as autonomous while requiring approval to add or remove peers; read that as: keep existing entries current, ask before changing who the peers are.)
 
-## MASTERPLAN.md — The Agent's Compass
+### Who reads the agent layer (0.7)
 
-MASTERPLAN.md is the most important human-authored file. Inspired by [karpathy/autoresearch](https://github.com/karpathy/autoresearch), it serves as the `program.md` that guides autonomous agent behavior.
+The agent layer is `memory/**`, `MEMORY.md`, `HEARTBEAT.md`, `docs/plans/**` and `docs/agent-plans/**`. It is kept in git, so every member with the repository reads it, and since 0.7 its writes through the Hub are class `workspace` in the rules (`schemas/change-classes.json`; an org's `all` rule does not reach it, and with no rule naming it a write is direct).
 
-### Structure
+- **On a Hub that signs people in** (0.7.1), those files are read only by the people who decide under the workspace rule that governs them, or, where the org has written no workspace rule, by its own `maintainer` role. Anyone else is answered as for a file that is not there, and sees proposals and the ledger without that file's text, path or diff. An org with neither a workspace rule nor a `maintainer` role has nobody signed in to its hosted Hub who reads them. The person at the machine reads them as before.
+- **Council memory.** What only some may read (a person's situation, pay, contact details, money owed, anything Steward-only) does not go into the agent layer at all. `npm run memory -- add --level <hat or role>` posts it to the running Hub, which keeps it as a record of the private collection `council-memory`, outside git; with no Hub running it is refused, and nothing is written elsewhere instead. `--level members` appends to `memory/<date>.md` as before. `/close` asks "members or Council?" of each entry, and when unsure it is Council (`scripts/memory.mjs`, `.claude/commands/close.md`).
+- **The doctor's agent-layer check** counts what in those files looks like personal data (e-mail addresses, `0x` addresses, phone-like numbers, the names in `data/members.yaml`), never printing a value; run it with `--before-widening` before membership widens, and the counts become blockers. See [Instance doctor](INSTANCE-DOCTOR.md).
 
-```markdown
-# MASTERPLAN.md — [Org Name]
+### The safety policy
 
-## Identity
+From `AGENTS.md` section 6.
 
-Who this agent is, what org it serves, its mandate.
+- Without approval: read any file; write `memory/`, `MEMORY.md` and `HEARTBEAT.md`; write meeting notes and project pages under `packages/operations/`; run `npm run generate:schemas`; respond in the active session.
+- Needs operator approval: messages to external parties, on-chain transactions, publishing to external platforms, edits to identity files, any financial action, adding or removing federation peers, changes to governance boundaries or safety policies.
 
-## Activations
+The policy is enforced by instruction only, with one exception: git. `.claude/settings.json` denies `git stash`, `git clean` and `git reset --hard` and runs a guard script (`scripts/guards/deny-destructive-git.mjs`) before every Bash call in Claude Code. See [Vault safety](VAULT-SAFETY.md). Nothing technical stops an agent from editing `SOUL.md`; the files say it must not.
 
-What the agent should focus on RIGHT NOW.
+## MASTERPLAN.md
 
-- [ ] Process Q1 meeting backlog
-- [ ] Fill gaps in carbon-markets knowledge domain
-- [ ] Prepare Q2 assembly materials
+`MASTERPLAN.md` is the file an operator edits to steer agents. It is inspired by the `program.md` of [karpathy/autoresearch](https://github.com/karpathy/autoresearch). The scaffold a new instance receives has three sections: Mandate, Activations (what to focus on now) and Character. The framework's own `MASTERPLAN.md` has more: identity, architecture, activations, research directions, success metrics, boundaries, active instances, development flow and a three-year vision. No script parses either; agents read them as prose.
 
-## Research Directions
+## Setting up the files
 
-Longer-term knowledge gaps to fill, processes to improve.
+Cloning (`npm run clone:framework`) scaffolds the files; filling them with the organization's reality is agent-led. The `bootstrap-interviewer` skill walks six topics (identity, team, projects, communication, network, data sources) and writes `SOUL.md`, `IDENTITY.md`, `data/members.yaml`, `data/projects.yaml`, `data/channels.yaml` and the identity section of `federation.yaml`; per `BOOTSTRAP.md` it also fills `TOOLS.md` and `data/sources.yaml`. It runs inside whichever agent host you use; there is no web form. `BOOTSTRAP.md` describes the phases: identity capture, source ingestion (repositories listed in `repos.manifest.json`, documents, Notion) and ongoing learning. See [Setup](SETUP.md) and [Operator guide](OPERATOR-GUIDE.md).
 
-- Investigate conviction voting mechanisms for our context
-- Map regional funding landscape for Southern Europe
+## Skills
 
-## Success Metrics
+Skills define what an agent can do. A skill is `skills/<name>/SKILL.md`: frontmatter and instructions. This repository has 36. The framework-level ones that exist as directories here:
 
-How to evaluate whether improvements worked.
+| Skill | Purpose |
+|---|---|
+| `org-os-init` | Session lifecycle: initialize, plan, execute, close |
+| `bootstrap-interviewer` | Guided setup interview for a new instance |
+| `meeting-processor` | Transcripts to structured meeting records, decisions and action items |
+| `funding-scout` | Find and track funding opportunities |
+| `knowledge-curator` | Organize knowledge by domain into `knowledge/` |
+| `capital-flow` | Treasury monitoring and transaction queueing |
+| `schema-generator` | Regenerate EIP-4824 schemas from the registries |
+| `heartbeat-monitor` | Task and health monitoring |
+| `idea-scout` | Scan knowledge for ecosystem gaps, surface ideas into `data/ideas.yaml` |
+| `workspace-improver` | The autoresearch improvement loop (below) |
+| `instance-doctor` | Assess an instance and sync it from the framework (see [Instance doctor](INSTANCE-DOCTOR.md)) |
+| `knowledge-graph` | Query the graphify graph before searching files |
 
-- Schema validation passes: `npm run validate:schemas`
-- HEARTBEAT pending count decreasing
-- Knowledge coverage increasing per domain
+The rest are vendored or general-purpose (the `superpowers-*` set, `skill-creator`, `mcp-builder`, `notion-cli`, `web-browsing` and others). `scripts/lib/discover-skills.mjs`, behind `npm run generate:skills`, walks `skills/` and writes `SKILLS.md` and `.well-known/skills.json`. A skill an instance wrote reaches the framework through the process in [Skill promotion](SKILL-PROMOTION.md); the format is in [Skill specification](SKILL-SPECIFICATION.md).
 
-## Boundaries
+## Agent personas
 
-What NOT to change autonomously.
+The framework's own personas are two Berd agent files. `.agents/agents/operator.md` (runs instances day to day: sessions, registries, memory, vault-safe git) and `.agents/agents/upstream.md` (develops the framework itself) are Agent Markdown: frontmatter with `name`, `description` and optional `good_for`, `vibes`; the body is the system prompt. Both carry `managed_by: org-os`.
 
-- Do not modify SOUL.md, IDENTITY.md, federation.yaml
-- Do not send external messages without approval
-- Do not commit financial transactions
-- Draft-and-present for anything public-facing
+- `npm run sync:agents` (`scripts/sync-agents.mjs`) mirrors them one way to the user-level `~/.agents/agents/`. It only overwrites files that carry the `managed_by: org-os` marker, skips hand-authored ones (`--adopt` takes one over) and never touches agents listed in `.berd-bundled-agents.json`.
+- `npm run sync:skills:berd` (`scripts/sync-skills-berd.mjs`) mirrors five skills (`org-os-init`, `meeting-processor`, `heartbeat-monitor`, `knowledge-curator`, `funding-scout`) into `.agents/skills/`; the list is the materialization entries of `modules/org-os-berd/module.yaml`. Same marker rule; `--check` compares without writing and runs inside `npm run selftest`. `.agents/skills/feynman/` is hand-authored, git-ignored and left alone.
+- Whether Berd loads those skills in a live session was not observed; the repository's Berd page records only source-level confirmation. See [Berd](integrations/berd.md).
 
-## Workfronts
+`.opencode/agents/` held four OpenCode agent files written for one operator's personal vault. They were removed in 0.7.4, and `clone-excludes` keeps the folder out of new instances.
 
-Active workstreams with priorities and context.
+There is no framework-defined "mode" system. An earlier page described named modes (`governance-facilitator`, `content-processor`, `ideation-curator`, and instance-specific `cooperative-ops`, `aggregator-indexer`, `network-facilitator`) defined in `.claude/agents/`. That directory does not exist and no script or skill reads such files; the modes were a pattern that was never implemented. To change how an agent behaves in a context today, write it in `AGENTS.md`, `MASTERPLAN.md` or a skill.
 
-## Safety Policy
+## The autoresearch loop
 
-Autonomous vs. requires-approval actions.
-```
-
-## Bootstrapping — 3 Phases
-
-### Phase 1: Guided Interview (BOOTSTRAP.md)
-
-The `bootstrap-interviewer` skill runs an interactive setup:
-
-1. "What is your organization's name, type, and mission?"
-2. "Who are the core members and their roles?"
-3. "What are your active projects?"
-4. "What governance model do you use?"
-5. "What communication channels do you use?"
-6. "Do you have existing data sources (Notion, Google Drive, GitHub repos)?"
-
-The interview auto-generates:
-
-- `SOUL.md` — from mission, values answers
-- `IDENTITY.md` — from name, type, governance answers
-- `data/members.yaml` — from team answers
-- `data/projects.yaml` — from projects answers
-- `data/channels.yaml` — from channels answers
-- `federation.yaml` — from network/integration answers
-
-This phase works via both **CLI** (Claude Code terminal) and **web form** (for non-tech operators). See `docs/OPERATOR-GUIDE.md`.
-
-### Phase 2: Source Ingestion
-
-After initial setup, point the agent at existing knowledge sources:
-
-- **GitHub repos** → Crawl, index, populate `data/sources.yaml` and `repos.manifest.json`
-- **Website/blog** → Extract org info, articles into `knowledge/`
-- **Podcast** → Process episodes into `knowledge/podcast/`
-- **Notion** → Map databases, configure sync in `TOOLS.md`
-- **Documents** → Process into `knowledge/` or `docs/`
-
-The `knowledge-curator` skill handles ingestion. Each source is registered in `data/sources.yaml` with its sync method and status.
-
-### Phase 3: Ongoing Learning
-
-Continuous improvement through daily operations:
-
-- **Meeting processing** → Builds operational memory, extracts action items
-- **Heartbeat monitoring** → Learns priorities, tracks task completion
-- **Knowledge curation** → Expands knowledge commons from new content
-- **Idea scouting** → Surfaces ecosystem gaps from knowledge analysis
-- **Feedback loop** → Agent behavior improves based on operator corrections
-
-## Skills Architecture
-
-Skills define what agents can do. They follow a three-tier model:
-
-### Core Skills (from framework)
-
-Provided by org-os and available to all instances:
-
-| Skill                   | Purpose                                                 |
-| ----------------------- | ------------------------------------------------------- |
-| `meeting-processor`     | Process transcripts, extract decisions and action items |
-| `funding-scout`         | Identify funding opportunities, track applications      |
-| `knowledge-curator`     | Aggregate knowledge from sources into knowledge/        |
-| `capital-flow`          | Orchestrate capital movements, queue transactions       |
-| `schema-generator`      | Generate EIP-4824 schemas from data/\*.yaml             |
-| `heartbeat-monitor`     | Proactive health checks, task prioritization            |
-| `bootstrap-interviewer` | Guided interview for new org setup (v2)                 |
-| `idea-scout`            | Scan knowledge for ecosystem gaps, surface ideas (v2)   |
-| `workspace-improver`    | Autonomous improvement loop — autoresearch (v2)         |
-
-### Custom Skills (instance-specific)
-
-Created by instances for their unique needs. Examples:
-
-- `cooperative-ops` (refi-bcn-os) — Barcelona cooperative operations
-- `governance-facilitator` (refi-dao-os) — Steward council facilitation
-
-### Shared Skills (promoted from instances)
-
-When a custom skill proves valuable, it can be promoted:
-
-1. Instance creates custom skill in `skills/`
-2. Skill proves value over multiple sessions
-3. Instance proposes to framework (PR or federation declaration)
-4. Framework reviews, generalizes, adds to core
-5. Other instances inherit via `npm run sync:upstream`
-
-### Skill Format (SKILL.md)
-
-```yaml
----
-name: meeting-processor
-version: 1.0.0
-description: Process meeting transcripts into structured records
-triggers:
-  - "process meeting"
-  - "meeting transcript"
-inputs:
-  - transcript (text or file path)
-  - date (ISO 8601)
-  - participants (list)
-outputs:
-  - data/meetings.yaml entry
-  - memory/YYYY-MM-DD.md log
-  - action items in HEARTBEAT.md
-dependencies:
-  - schema-generator
----
-
-# Meeting Processor
-
-## When to Use
-[description of when this skill activates]
-
-## Procedure
-[step-by-step instructions for the agent]
-
-## Output Format
-[expected outputs and where they go]
-
-## Examples
-[concrete examples]
-```
-
-See `docs/SKILL-SPECIFICATION.md` for the complete spec.
-
-## Knowledge Graph (Graphify)
-
-`graphify-out/graph.json` is a canonical data file (like `data/*.yaml`) built by
-the upstream `graphify` CLI at session close. Three read-only consumers:
-`scripts/graph-status.mjs` (dashboard), `scripts/graph-gaps.mjs`
-(`data/knowledge-gaps.yaml` → knowledge-curator), and `graphify query` (agents).
-org-os never writes into the graph. Full design:
-`docs/superpowers/specs/2026-07-22-graphify-kms-integration-design.md`;
-integration doc: `docs/integrations/graphify.md`.
-
-## Autoresearch Pattern — Autonomous Improvement
-
-Inspired by [karpathy/autoresearch](https://github.com/karpathy/autoresearch), org-os agents don't just operate within the workspace — they improve it.
-
-### The Loop
+The `workspace-improver` skill (`skills/workspace-improver/SKILL.md`) lets an agent improve the workspace in scoped steps:
 
 ```
-1. Read MASTERPLAN.md → understand current directions
-2. Identify improvement → knowledge gap, stale data, missing skill
-3. Make scoped change → process a source, fill a gap, draft a skill
-4. Evaluate → schemas pass? HEARTBEAT count down? coverage up?
-5. Log results → memory/YYYY-MM-DD.md with before/after metrics
-6. Keep or revert → based on evaluation
-7. Repeat
+1. Read MASTERPLAN.md, HEARTBEAT.md and the last three daily logs
+2. Pick one improvement: an unchecked activation, a data gap, a knowledge gap,
+   a failing schema check, a pending heartbeat task
+3. Record baseline metrics
+4. Make one change that fits a session and can be reverted
+5. Run npm run generate:schemas && npm run validate:schemas, measure again
+6. Keep it if metrics held or improved, revert it if they regressed,
+   keep and flag for review if unclear
+7. Log before and after in memory/YYYY-MM-DD.md
 ```
 
-### Mapping to autoresearch
+The mapping to autoresearch is by analogy: `MASTERPLAN.md` plays the role of `program.md`, `data/*.yaml` and `skills/` are the editable surface, `HEARTBEAT.md` metrics are the evaluation, `memory/` is the experiment log. The evaluation is whatever the agent measures; the only automatic check is schema validation. The loop runs when the operator asks (the skill's triggers include "improve workspace" and "autoresearch"); no scheduler starts it. See [Autoresearch](AUTORESEARCH.md).
 
-```
-MASTERPLAN.md          = program.md     (human-written directions)
-data/*.yaml + skills/  = train.py       (the editable surface)
-HEARTBEAT.md metrics   = val_bpb        (evaluation criteria)
-memory/YYYY-MM-DD.md   = experiment log (what was tried, results)
-```
+## Knowledge graph
 
-### Boundaries
+`graphify-out/graph.json`, when it exists, is built by the external `graphify` CLI (`npm run graph:update` runs it if installed). Three things read it and none writes to it: `scripts/graph-status.mjs` (`npm run graph:status`), `scripts/graph-gaps.mjs` (`npm run graph:gaps`, which feeds `data/knowledge-gaps.yaml` to `knowledge-curator`), and `graphify query` for agents. `AGENTS.md` tells agents to query the graph before searching files when it is present. See [Graphify](integrations/graphify.md).
 
-Agents may modify:
+## Agent hosts
 
-- `data/*.yaml` — Fill gaps, update stale records
-- `knowledge/` — Process new content, improve pages
-- `memory/` — Log everything
-- `skills/` — Draft new skill definitions
-- `ideas/` — Surface new ideas from knowledge analysis
-- `.well-known/` — Regenerate schemas
+The same repository works with several hosts because each reads the same files; only the config differs.
 
-Agents must NOT modify without human approval:
+| Host | What is in the repository |
+|---|---|
+| Claude Code | `.claude/settings.json` (git guard), `.claude/commands/` (the canonical slash commands), `CLAUDE.md` |
+| OpenCode | `.opencode/commands/`, `.opencode/opencode.json` (loads `AGENTS.md` and every `skills/*/SKILL.md`), `packages/opencode-integration` |
+| Cursor | `.cursor/commands/` only |
+| Hermes | `skills/commands/` and `packages/hermes-integration` |
+| Berd | `.agents/agents/`, `.agents/skills/` (above) |
 
-- `SOUL.md` — Organization identity
-- `IDENTITY.md` — Governance infrastructure
-- `federation.yaml` — Network relationships
-- `MASTERPLAN.md` — Strategic direction
-- `package.json` — Dependencies and scripts
+`npm run sync:commands` generates the OpenCode, Cursor and Hermes command files from `.claude/commands/`. See [Host integration](HOST-INTEGRATION.md) and [Tool setup](TOOL-SETUP.md). External systems (Notion, GitHub) are reached through environment variables, the host's own MCP configuration or CLI skills; the repository ships no MCP server configuration.
 
-### Evaluation Metrics
+## Not built
 
-| Metric             | How to measure                             | Target        |
-| ------------------ | ------------------------------------------ | ------------- |
-| Schema validation  | `npm run validate:schemas`                 | Pass          |
-| HEARTBEAT pending  | Count unchecked items                      | Decreasing    |
-| Knowledge coverage | domain coverage in knowledge-manifest.yaml | Increasing    |
-| Data freshness     | last_updated dates in registries           | Within 7 days |
-| Idea pipeline      | ideas.yaml entries in active states        | Growing       |
-
-## Agent Modes
-
-Agent modes are personas that shape how the agent operates. They're defined in `.claude/agents/` and activated via slash commands or context.
-
-### Standard Modes (provided by framework)
-
-| Mode                     | Focus                | Use when                        |
-| ------------------------ | -------------------- | ------------------------------- |
-| `default`                | General operations   | Normal day-to-day work          |
-| `governance-facilitator` | Governance processes | Elections, proposals, decisions |
-| `content-processor`      | Content ingestion    | Processing blog, podcast, docs  |
-| `ideation-curator`       | Idea pipeline        | Managing ideas, scouting gaps   |
-
-### Custom Modes (instance-specific)
-
-Instances can add modes for their context:
-
-- `cooperative-ops` — Cooperative management workflows
-- `aggregator-indexer` — Content aggregation and indexing
-- `network-facilitator` — Cross-org coordination (for hub nodes)
-
-### Mode Definition
-
-```yaml
-# .claude/agents/governance-facilitator.md
----
-name: governance-facilitator
-description: Facilitate governance processes
-activation: "When discussing elections, proposals, or governance decisions"
----
-
-# Governance Facilitator Mode
-
-## Focus
-Guide governance processes: elections, proposals, council decisions.
-
-## Behavior
-- Reference data/governance.yaml for current state
-- Follow established governance timeline
-- Draft-and-present all public communications
-- Track decisions in MEMORY.md
-
-## Tools
-- Meeting processor for governance meetings
-- Schema generator for governance schema updates
-```
-
-### Berd Personas (`.agents/agents/`)
-
-For the Berd desktop app, personas live as **Agent Markdown**
-files in the repo at `.agents/agents/<slug>.md` — Berd's project-local agent
-directory, discovered automatically when the workspace is open. Format: YAML
-frontmatter with required `name` + `description` (optional `good_for`, `vibes`,
-`avatar`, `model`), body = the persona's system prompt.
-
-The framework ships two:
-
-| Persona       | Role                                                                             |
-| ------------- | -------------------------------------------------------------------------------- |
-| `operator.md` | Runs org-os workspaces day to day — sessions, registries, memory, vault-safe git |
-| `upstream.md` | Develops the framework itself — skills, schemas, docs, migrations                |
-
-Some personas need to work when no project is open (Operator spans the whole
-federation), so `npm run sync:agents` mirrors the repo's agents to the
-user-level `~/.agents/agents/`. The sync is one-way (repo → global) and marker
-guarded: every canonical file carries `managed_by: org-os` in its frontmatter,
-and the script only overwrites global files bearing that marker. Hand-authored
-global agents are skipped (pass `--adopt` to take one over); agents bundled by
-the Berd app itself are never touched. Edit personas in the repo, then re-run
-the sync — global edits to managed copies are overwritten on the next sync.
-
-Instances that adopt Berd add their own personas to their `.agents/agents/`;
-the sync script arrives with the framework via `sync:upstream`.
-
-#### Berd Skills Bridge (`.agents/skills/`)
-
-Alongside personas, `modules/org-os-berd/module.yaml` also owns a curated **exposure list**:
-its materialization entries (`skills/<name>: .agents/skills/<name>`) name which framework
-skills are mirrored into Berd's project-local Agent Skills directory — today `org-os-init`,
-`meeting-processor`, `heartbeat-monitor`, `knowledge-curator`, and `funding-scout`.
-`scripts/sync-skills-berd.mjs` (`npm run sync:skills:berd`) performs the mirror: a one-way,
-marker-guarded copy of the same shape as `sync-agents.mjs` — each materialized `SKILL.md`
-gains an injected `managed_by: org-os` frontmatter line, and only files carrying that marker
-are overwritten on re-sync (hand-authored targets are skipped; `--adopt` takes one over).
-`--check` byte-compares the mirror against the manifest without writing, and is wired into
-`npm run selftest` as an optional step (`skipKey: "berd"`) so drift between the manifest's
-exposure list and the committed `.agents/skills/` tree fails CI rather than going unnoticed.
-`.agents/skills/feynman/` is untouched by any of this — it is hand-authored, carries no
-`managed_by` marker, and the sync's hand-authored-detection skips it by design.
-
-`.agents/skills/` is Berd/Goose's project-local Agent Skills discovery path per
-`docs/integrations/berd.md`, confirmed there from Berd's own Tauri scanner source and Goose's
-own source — two independent implementations that agree. That verification is source-level,
-not a runtime observation: **no skill mirrored by this bridge has yet been confirmed to load
-or run inside an actual Berd session.** Live GUI confirmation, and any pruning of the exposure
-list that follows from it, are deferred to the operator (see `docs/integrations/berd.md` §
-"Skills dir").
-
-### Autonomous Actions (no approval needed)
-
-- Read any workspace file
-- Update memory/ daily logs
-- Update HEARTBEAT.md task status
-- Generate and validate schemas
-- Process content into knowledge/
-- Surface ideas from knowledge analysis
-- Draft documents for review
-
-### Requires Human Approval
-
-- Send external messages (Telegram, email, GitHub)
-- Execute on-chain transactions
-- Publish content publicly
-- Modify identity files (SOUL, IDENTITY, federation.yaml)
-- Commit financial decisions
-- Change network relationships
-- Create or delete repositories
-
-### Escalation Protocol
-
-When uncertain about autonomy level:
-
-1. Check MASTERPLAN.md boundaries section
-2. If not covered, default to draft-and-present
-3. Log the question in memory/ for human review
-4. Ask the operator if available
-
-## Integration Points
-
-### Agent Runtimes
-
-org-os workspaces are compatible with multiple agent runtimes:
-
-- **Claude Code** — Primary CLI agent (`.claude/` config)
-- **Cursor** — IDE agent (`.cursor/` config)
-- **OpenClaw** — Autonomous agent platform
-- **OpenCode** — Open-source agent runtime
-- **Berd** — Desktop agent app (`.agents/agents/` personas, see § Agent Modes)
-
-Each runtime reads the same workspace files. Platform-specific config goes in their respective directories. See `docs/TOOL-SETUP.md`.
-
-### External Tools via MCP
-
-Agents can access external systems via MCP (Model Context Protocol) servers:
-
-- **Notion** — Read/write Notion databases
-- **GitHub** — PR management, issue tracking
-- **Telegram** — Community messaging (read-only recommended)
-
----
-
-_Part of org-os v2.0.0 — see [SKILL-SPECIFICATION.md](SKILL-SPECIFICATION.md) for skill authoring guide._
+- A web form for the setup interview.
+- Named agent modes in `.claude/agents/`.
+- Unattended agent runs inside the framework. `AGENTS.md` describes memory auto-commit by a `.memory-sync.sh` cron; that script is not in this repository.
+- Technical enforcement of the safety policy beyond the git guard.

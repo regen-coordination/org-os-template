@@ -6,26 +6,67 @@ import Layout from "../components/Layout.astro";
 import Hero from "../components/Hero.astro";
 import SectionBlock from "../components/SectionBlock.astro";
 import FederationMapIsland from "../components/FederationMapIsland.astro";
-import ModuleCard from "../components/ModuleCard.astro";
 import { federationData } from "../lib/federation";
 import { withBase } from "../lib/base";
+import { SECTIONS, pagesBySection } from "../data/docs-manifest.mjs";
+import { VERSION, REPO_URL } from "../lib/repo.mjs";
 
 const landing = yaml.load(readFileSync(resolve(process.cwd(), "src/data/landing.yaml"), "utf8")) as any;
-const mod = yaml.load(readFileSync(resolve(process.cwd(), "src/data/modules.yaml"), "utf8")) as any;
-const teaserModules = mod.modules.slice(0, 3);
-const statline = `${federationData.nodes.length} instances · framework v0.5 · EIP-4824`;
+const sections = SECTIONS.map((s) => ({ ...s, pages: pagesBySection(s.id) })).filter((s) => s.pages.length > 0);
+const SHOWN = 4;
 ---
-<Layout title="Home" current="home">
+<Layout title="Home" current="home" description="Documentation for operators of org-os instances.">
   <div class="container">
-    <Hero eyebrow={landing.eyebrow} title={landing.title} subtitle={landing.subtitle} ctas={landing.ctas} statline={statline} />
+    <Hero label={`org-os · v${VERSION} · ${landing.label}`} title={landing.title} subtitle={landing.subtitle}
+      ctas={landing.ctas} commands={landing.commands} commandsTitle={landing.commands_title} />
+
+    <SectionBlock index="01" title="Where to look" href={withBase("/docs")} cta="All docs">
+      <div class="sections">
+        {sections.map((s) => (
+          <article class="cell">
+            <h3><a href={withBase(`/docs/${s.pages[0].slug}`)}>{s.title}</a></h3>
+            <p class="summary">{s.summary}</p>
+            <ul>
+              {s.pages.slice(0, SHOWN).map((p) => <li><a class="link" href={withBase(`/docs/${p.slug}`)}>{p.title}</a></li>)}
+            </ul>
+            {s.pages.length > SHOWN && <p class="more mono">+ {s.pages.length - SHOWN} more</p>}
+          </article>
+        ))}
+      </div>
+    </SectionBlock>
+
+    <div class="strip">
+      <SectionBlock index="02" title={`Version ${VERSION}`} href={`${REPO_URL}/blob/main/CHANGELOG.md`} cta="Changelog">
+        <p class="note">These docs describe org-os <code class="code-inline">v{VERSION}</code>. Each page says which commit it was checked against.</p>
+        <p class="note intro">{landing.intro} <a class="link" href={withBase(landing.intro_link.href)}>{landing.intro_link.label}</a>.</p>
+      </SectionBlock>
+      <SectionBlock index="03" title="Federation" href={withBase("/federation")} cta="The network">
+        <p class="note"><strong data-operational-count>{federationData.operational}</strong> operational {federationData.operational === 1 ? "instance" : "instances"}, of <span data-registered-count>{federationData.registered}</span> registered. {federationData.operationalDefinition}</p>
+        <div class="map"><FederationMapIsland mode="mini" /></div>
+      </SectionBlock>
+    </div>
   </div>
-  <SectionBlock index="01" eyebrow="Federation" title="One OS, many nodes" href={withBase("/federation")} cta="Explore the network">
-    <FederationMapIsland mode="mini" />
-  </SectionBlock>
-  <SectionBlock index="02" eyebrow="v0.5 roadmap" title="Modules" href={withBase("/modules")} cta="See all modules">
-    <div class="grid">{teaserModules.map((m: any) => <ModuleCard {...m} />)}</div>
-  </SectionBlock>
 </Layout>
 <style>
-.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: var(--space-5); }
+.sections { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); column-gap: var(--space-8); row-gap: var(--space-8); }
+.cell { display: flex; flex-direction: column; gap: var(--space-2); }
+.cell h3 { font-size: var(--text-md); }
+.cell h3 a { color: var(--color-ink); }
+.cell h3 a:hover { color: var(--color-accent); }
+.cell .summary { font-size: var(--text-sm); color: var(--color-muted); line-height: var(--leading-snug); }
+.cell ul { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 0.15rem; font-size: var(--text-sm); margin-top: var(--space-1); }
+.cell .more { font-size: var(--text-xs); color: var(--color-muted); }
+
+.strip { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); column-gap: var(--space-12); align-items: start; }
+.note { font-size: var(--text-sm); color: var(--color-muted); max-width: 60ch; }
+.note strong { color: var(--color-ink); }
+.map { margin-top: var(--space-5); }
+
+.intro { margin-top: var(--space-5); padding-top: var(--space-5); border-top: var(--border-hair) solid var(--color-line); }
+
+@media (max-width: 860px) {
+  .sections { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .strip { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 520px) { .sections { grid-template-columns: minmax(0, 1fr); } }
 </style>

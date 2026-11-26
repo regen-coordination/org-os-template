@@ -1,23 +1,41 @@
 ---
 import Layout from "../../components/Layout.astro";
 import { withBase } from "../../lib/base";
-import { DOCS_ALLOWLIST } from "../../data/docs-allowlist";
-const groups = [...new Set(DOCS_ALLOWLIST.map((d) => d.group))];
+import { SECTIONS, pagesBySection } from "../../data/docs-manifest.mjs";
+import { VERSION, REPO_URL } from "../../lib/repo.mjs";
+const sections = SECTIONS.map((s) => ({ ...s, pages: pagesBySection(s.id) })).filter((s) => s.pages.length > 0);
 ---
-<Layout title="Docs" current="docs" description="org-os documentation — architecture, federation, data model, operating.">
-  <div class="container prose">
-    <p class="eyebrow">Documentation</p>
-    <h1>Docs</h1>
-    <p>Curated from the org-os framework docs. The full set lives in the <a href="https://github.com/regen-coordination/org-os-template/tree/main/docs">repo</a>.</p>
-    {groups.map((g) => (
-      <section>
-        <h2>{g}</h2>
+<Layout title="Docs" current="docs" description="org-os documentation for operators of instances.">
+  <div class="container">
+    <header class="page-head">
+      <p class="eyebrow">Documentation · v{VERSION}</p>
+      <h1>Docs</h1>
+      <p class="lead">For people who run an org-os instance. Working notes, plans and research stay in the <a class="link" href={`${REPO_URL}/tree/main/docs`}>repository</a>.</p>
+    </header>
+    {sections.map((s) => (
+      <section class="section">
+        <h2>{s.title}</h2>
+        <p class="about">{s.summary}</p>
         <ul>
-          {DOCS_ALLOWLIST.filter((d) => d.group === g).map((d) => (
-            <li><a href={withBase(`/docs/${d.slug}`)}>{d.title}</a></li>
+          {s.pages.map((p) => (
+            <li>
+              <a href={withBase(`/docs/${p.slug}`)}>{p.title}</a>
+              <span>{p.summary}</span>
+            </li>
           ))}
         </ul>
       </section>
     ))}
   </div>
 </Layout>
+<style>
+.section { margin-top: var(--space-10); }
+.section .about { color: var(--color-muted); font-size: var(--text-sm); margin-top: var(--space-1); }
+.section ul { list-style: none; padding: 0; margin-top: var(--space-3); border-top: var(--border-hair) solid var(--color-line-2); }
+.section li { display: grid; grid-template-columns: minmax(12rem, 17rem) 1fr; gap: var(--space-5);
+  padding: var(--space-2) 0; border-bottom: var(--border-hair) solid var(--color-line); align-items: baseline; }
+.section li a { font-family: var(--font-mono); font-size: var(--text-sm); }
+.section li a:hover { text-decoration: underline; text-underline-offset: 0.2em; }
+.section li span { color: var(--color-ink-2); font-size: var(--text-sm); line-height: var(--leading-snug); }
+@media (max-width: 640px) { .section li { grid-template-columns: 1fr; gap: 0.15rem; } }
+</style>

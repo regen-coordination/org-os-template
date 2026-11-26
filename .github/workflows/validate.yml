@@ -13,6 +13,9 @@ jobs:
     # run takes 18-19 minutes (19m03s on #21, 18m36s on main at 3e12c24f), too close to 20.
     timeout-minutes: 30
     steps:
+      # Full history: the site's verify-build looks up each doc's `verified`
+      # commit (site/src/data/docs-manifest.mjs). A shallow clone has one
+      # commit and would fail every page.
       - uses: actions/checkout@v4
         with:
           # validate:governance reads the history; a shallow clone has none to judge.
@@ -39,13 +42,6 @@ jobs:
       # reach it and its 44 tests would be skipped by the selftest step below.
       - name: Install admin package dependencies
         working-directory: packages/admin
-        run: npm ci
-
-      # The site's client bundle imports d3-force via
-      # packages/org-os-federation-map; without this the site build below fails
-      # to resolve it on a runner.
-      - name: Install federation-map dependencies
-        working-directory: packages/org-os-federation-map
         run: npm ci
 
       - name: Install site dependencies
@@ -94,6 +90,13 @@ jobs:
       - name: Site tests
         working-directory: site
         run: npm test
+
+      # A report, not a gate: lists the docs pages whose covered code changed
+      # after the page was verified (spec §5.5). It reports and never blocks.
+      - name: Docs drift report
+        working-directory: site
+        run: npm run drift | tee -a "$GITHUB_STEP_SUMMARY"
+        continue-on-error: true
 
       - name: Check version triplet consistency
         run: npm run version:check

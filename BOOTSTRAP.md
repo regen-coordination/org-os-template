@@ -43,7 +43,7 @@ npm run clone:framework -- --target ../my-new-org --config /tmp/my-org-config.ya
 
 # 3. Bootstrap-interviewer fills in remaining identity (Phase 1 below)
 cd ../my-new-org
-npm install
+npm ci                           # not npm install: it rewrites package-lock.json's header
 npm run validate:structure
 npm run selftest
 ```

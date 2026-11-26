@@ -1,173 +1,71 @@
 # TOOL-SETUP.md — External Tool Configuration
 
-Version: 2.0.0
+org-os reaches external systems in three ways: environment variables read by its own scripts, the agent host's own MCP (Model Context Protocol) configuration, and vendored CLI skills. This page says which is built, how to set each up, and where a thing is not built.
 
-## Overview
+## Credentials
 
-org-os agents can access external systems via MCP (Model Context Protocol) servers. This document covers how to configure each agent runtime to access Notion, GitHub, and other tools.
+- Secrets live in `.env` at the repository root. `.env` and `.env*.local` are in `.gitignore`.
+- `.env.example` lists the variables the framework reads: `NOTION_API_KEY`, and for the optional modules `BUZZ_RELAY_URL`, `BUZZ_CHANNEL`, `BUZZ_PRIVATE_KEY`, `BUZZ_CLI_BIN`, `PAPER_MCP_URL`, `PAPER_FILE_ID`. Copy it: `cp .env.example .env`.
+- `scripts/initialize.mjs` loads `.env` itself (through `dotenv`).
+- `TOOLS.md` records where things are (endpoints, channel ids, database ids, which env var holds which token). It never holds a token.
 
-## Notion MCP Configuration
+## Notion
 
-### Prerequisites
-1. A Notion integration token (create at https://www.notion.so/my-integrations)
-2. Database IDs for each data registry you want to sync
-3. Share relevant Notion pages with the integration
+### Dashboard read (built)
 
-### Claude Code
+If `NOTION_API_KEY` is set and `TOOLS.md` contains database ids, `npm run initialize` (and `initialize:markdown`) reads those Notion databases through `@notionhq/client` and merges projects, meetings and members into the dashboard. Without a key it prints `[info] NOTION_API_KEY not set` on stderr and uses local YAML only.
 
-Add to `.claude/settings.json`:
-```json
-{
-  "mcpServers": {
-    "notion": {
-      "command": "npx",
-      "args": ["-y", "@anthropic/notion-mcp"],
-      "env": {
-        "NOTION_API_KEY": "secret_..."
-      }
-    }
-  }
-}
-```
+To set it up:
 
-### Cursor
-
-Add to `.cursor/mcp.json`:
-```json
-{
-  "mcpServers": {
-    "notion": {
-      "command": "npx",
-      "args": ["-y", "@anthropic/notion-mcp"],
-      "env": {
-        "NOTION_API_KEY": "secret_..."
-      }
-    }
-  }
-}
-```
-
-### OpenClaw
-
-Add to `openclaw.config.json`:
-```json
-{
-  "mcp": {
-    "servers": {
-      "notion": {
-        "command": "npx",
-        "args": ["-y", "@anthropic/notion-mcp"],
-        "env": {
-          "NOTION_API_KEY": "secret_..."
-        }
-      }
-    }
-  }
-}
-```
-
-### OpenCode
-
-Add to `.opencode/config.json` (or equivalent):
-```json
-{
-  "mcp": {
-    "notion": {
-      "command": "npx",
-      "args": ["-y", "@anthropic/notion-mcp"],
-      "env": {
-        "NOTION_API_KEY": "secret_..."
-      }
-    }
-  }
-}
-```
-
-## TOOLS.md Configuration
-
-Document your Notion workspace in `TOOLS.md`:
+1. Create an integration at https://www.notion.so/my-integrations and share the databases with it.
+2. Put the key in `.env` as `NOTION_API_KEY`.
+3. In `TOOLS.md`, add lines in this form (the script matches `Projects:`, `Meetings:` and `Members:` followed by a 32-character id, case-insensitive):
 
 ```markdown
-## Notion
-- Workspace: [Workspace Name]
-- Integration: [Integration Name]
-- Token reference: stored in .env (never commit tokens)
-
 ### Database IDs
-| Registry | Notion DB ID | Notion DB Name |
-|----------|-------------|----------------|
-| members.yaml | abc123... | Team Members |
-| projects.yaml | def456... | Projects Board |
-| meetings.yaml | ghi789... | Meeting Notes |
-| finances.yaml | jkl012... | Budget Tracker |
+
+- Projects: [32-char-database-id]
+- Meetings: [32-char-database-id]
+- Members: [32-char-database-id]
 ```
 
-## Notion ↔ YAML Sync
+Only these three databases are read, and only to display them. Nothing is written to Notion.
 
-### Field Mapping
+### Notion to YAML sync (not built)
 
-Define how Notion database columns map to YAML fields. Example for members:
+An earlier version of this page described `npm run sync:notion`, `sync:notion:pull` and `sync:notion:push`, a field-mapping table and timestamp-based conflict resolution. None of those scripts exist in `package.json` or `scripts/`. The registries in `data/*.yaml` remain the source of truth and are edited as files.
 
-| Notion Column | YAML Field | Type | Notes |
-|--------------|-----------|------|-------|
-| Name | name | title → string | |
-| Role | role | select → string | |
-| Status | status | select → string | Map "Active" → "active" |
-| Joined | joined | date → ISO 8601 | |
-| GitHub | handles.github | text → string | |
-| Telegram | handles.telegram | text → string | |
+### Notion CLI (vendored skill)
 
-### Sync Direction
+`skills/notion-cli/SKILL.md` is a vendored skill for Notion's `ntn` command-line client. It authenticates with `NOTION_API_TOKEN` (a different variable from the one `initialize` reads) or `ntn login`.
 
-- **Notion → YAML**: For day-to-day updates made by team members in Notion
-- **YAML → Notion**: For agent-generated updates (meeting processing, schema generation)
-- **Conflict resolution**: Timestamp-based. Most recent edit wins. Conflicts flagged in memory/ for review.
+### Notion over MCP (host configuration, not verified)
 
-### Running Sync
+Agent hosts that support MCP can be given a Notion server so the agent queries Notion directly. This repository ships no MCP server configuration for Notion and no code depends on it. The server package name, its environment variable and the config file each host reads change over time, so this page does not reproduce them: follow Notion's and your host's current documentation. What this repository keeps per host:
 
-```bash
-npm run sync:notion          # Full bidirectional sync
-npm run sync:notion:pull     # Notion → YAML only
-npm run sync:notion:push     # YAML → Notion only
-```
+| Host | Config in this repository |
+|---|---|
+| Claude Code | `.claude/settings.json` (the git-safety guard hook and deny rules; no MCP servers) |
+| Cursor | `.cursor/commands/` (slash commands only) |
+| opencode | `.opencode/opencode.json` (loads `AGENTS.md` and `skills/*/SKILL.md` as instructions) |
 
-## GitHub MCP
+## GitHub
 
-For agents that need to manage GitHub issues, PRs, and repos:
+No GitHub MCP server is configured in this repository. Agents use `git` and, where installed, the `gh` CLI.
 
-```json
-{
-  "mcpServers": {
-    "github": {
-      "command": "npx",
-      "args": ["-y", "@anthropic/github-mcp"],
-      "env": {
-        "GITHUB_TOKEN": "ghp_..."
-      }
-    }
-  }
-}
-```
+## Other tools
 
-## Other External Tools
+- **Google Drive / Docs:** record shared-folder URLs in `TOOLS.md`. No Google integration code ships.
+- **Telegram:** [CHAT-INTERFACE.md](CHAT-INTERFACE.md) is a specification for a chat-bot interface. This page does not claim a bot is built.
+- **Safe (treasury):** put the Safe address and chain in the `Treasury` section of `IDENTITY.md`; the `capital-flow` skill reads the Safe Transaction Service endpoint from `TOOLS.md`.
+- **Optional modules** (Buzz, Paper, Cloudflare OS, and others): see [Modules](MODULES.md).
 
-### Google Drive / Docs
-Reference in TOOLS.md with shared folder URLs. Access via Google MCP server or direct API.
+## Security notes
 
-### Telegram Bot
-For chat interface. See `docs/CHAT-INTERFACE.md` for bot configuration.
-
-### Safe (Treasury)
-For on-chain transaction queuing. Document Safe address and chain in IDENTITY.md. Access via Safe API.
-
-## Security Notes
-
-- **Never commit API tokens** to the repository
-- Store tokens in `.env` (add `.env` to `.gitignore`)
-- Use environment variable references in MCP configs
-- Document token locations in TOOLS.md without exposing values
-- Rotate tokens periodically
+- Never commit tokens. `.env` is ignored; keep it that way.
+- Reference tokens by variable name in `TOOLS.md`, never by value.
+- Rotate tokens periodically.
 
 ---
 
-_Part of org-os v2.0.0 — see [OPERATOR-GUIDE.md](OPERATOR-GUIDE.md) for the non-tech operator manual._
+_See [OPERATOR-GUIDE.md](OPERATOR-GUIDE.md) for the non-tech operator manual._
