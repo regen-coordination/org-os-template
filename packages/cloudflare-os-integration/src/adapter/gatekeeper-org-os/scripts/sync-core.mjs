@@ -16,14 +16,17 @@ import { fileURLToPath } from "node:url";
 const here = dirname(fileURLToPath(import.meta.url));
 const dest = resolve(here, "..", "vendor", "org-os-core");
 
-const repo =
-  process.env.ORG_OS_REPO ??
-  "/Users/luizfernando/Desktop/Workspaces/Zettelkasten/03 Libraries/org-os";
+const repo = process.env.ORG_OS_REPO;
+if (!repo) {
+  console.error("sync-core: set ORG_OS_REPO to the org-os repository root:");
+  console.error("  ORG_OS_REPO=/path/to/org-os node scripts/sync-core.mjs");
+  process.exit(1);
+}
 const src = join(repo, "packages", "cloudflare-os-integration", "src");
 
 if (!existsSync(src)) {
   console.error(`sync-core: source not found: ${src}`);
-  console.error("Set ORG_OS_REPO to the org-os repository root.");
+  console.error("ORG_OS_REPO must be the org-os repository root.");
   process.exit(1);
 }
 

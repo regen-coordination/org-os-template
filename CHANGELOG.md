@@ -8,6 +8,15 @@ For the policy that governs what counts as a version bump, see [`docs/VERSIONING
 
 _(Append changes here as they land.)_
 
+### Changed
+
+- **The repository carries less of the maintainer's machine and person.** `USER.md` keeps the working
+  preferences and drops the personal details. `graphify-out/cache/` is no longer committed (its stat index
+  recorded absolute local paths); the graph itself still is. `sync-core.mjs` in the Cloudflare adapter
+  takes the framework's path from `ORG_OS_REPO` only and says so when it is unset. The site's list of
+  private repositories (`site/scripts/map-addresses.mjs`) holds hashes of their names, not the names.
+  All of these stay in the repository's earlier history.
+
 ## [0.7.6] — 2026-11-26
 
 **0.7.6 is the docs read against 0.7, and one fix in `org-os-kms publish`.** The public site now publishes the v2

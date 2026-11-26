@@ -5,14 +5,22 @@
 // aggregator passes the map through publicMap before writing it; the verifier runs mapProblems on the built copy and
 // fails the build on anything that slipped through.
 
-// Repositories the map's sources link to that are private, as `owner/name` in lower case. Checked by hand
-// (`gh api repos/<owner>/<name> --jq .private`) on 2026-11-08; add one here when a new link turns out private.
-export const PRIVATE_REPOS = [
-  "luizfernandosg/zettelkasten",
-  "refibcn/refi-bcn",
-  "refibcn/refi-bcn-os",
-  "andrea-diome/altiplano-estepario",
+import { createHash } from "node:crypto";
+
+// Repositories the map's sources link to that are private, kept as the SHA-256 of `owner/name` in lower case, so
+// this file does not itself say which repositories are private. Checked by hand
+// (`gh api repos/<owner>/<name> --jq .private`) on 2026-11-08. To add one when a new link turns out private:
+//   node -e 'console.log(require("node:crypto").createHash("sha256").update("owner/name").digest("hex"))'
+// A hash of a short name is not a secret (anyone who guesses the name can test it); it only keeps the list unlabelled.
+export const PRIVATE_REPO_HASHES = [
+  "88abf581a09178bbbefbc5557c6dc18973887cdbb2aae436f6a6fd762ff52bf6",
+  "f34933f34b270076433123ca872b91bc45cae9365b847398fbf24bacaedb7065",
+  "896664959b5529a818d05fe05f3e6697d8d776faf0edc5a0fd3a1a91fed3a43c",
+  "2fcde94e1ef34e08dd9fff02778d7d2c2c52efba8354add0bf3f07d46f3467dd",
 ];
+
+/** The form a repository takes in PRIVATE_REPO_HASHES. */
+export const repoHash = (repo) => createHash("sha256").update(String(repo).toLowerCase()).digest("hex");
 
 // GitHub names that nobody has registered (`gh api users/<name>` gives 404, checked 2026-11-08). An address under
 // one would be served by whoever registers it. Remove a name once the project holds it.
@@ -21,7 +29,7 @@ export const UNREGISTERED_OWNERS = ["organizational-os", "regencoordination"];
 const lower = (s) => String(s).toLowerCase();
 
 /** Why `value` may not be published as an address, or null when it may. */
-export function addressProblem(value) {
+export function addressProblem(value, { privateRepoHashes = PRIVATE_REPO_HASHES } = {}) {
   if (typeof value !== "string" || !/^https:\/\/[^/\s]+/i.test(value.trim())) return "it is not an https address";
   let url;
   try { url = new URL(value.trim()); } catch { return "it is not an https address"; }
@@ -32,7 +40,7 @@ export function addressProblem(value) {
   if (githubOwner && UNREGISTERED_OWNERS.includes(githubOwner)) return `GitHub has no account named "${githubOwner}" (the name is not registered): whoever registers it would serve this address`;
   if (host === "github.com" && name) {
     const repo = `${owner}/${name.replace(/\.git$/, "")}`;
-    if (PRIVATE_REPOS.includes(repo)) return "it is a private repository";
+    if (privateRepoHashes.includes(repoHash(repo))) return "it is a private repository";
     if (kind === "tree" || kind === "blob") return "it is a folder inside another repository, not an address of its own";
   }
   return null;

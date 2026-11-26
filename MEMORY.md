@@ -8,7 +8,7 @@ _Lightweight index for persistent organizational memory. Detailed notes live in 
 
 - **Identity:** `IDENTITY.md` (org-os framework + orchestration hub)
 - **Values:** `SOUL.md`
-- **Operator:** `USER.md` (Luiz Fernando, solo maintainer)
+- **Operator:** `USER.md` (the maintainer; named in `IDENTITY.md`)
 - **Mandate:** `MASTERPLAN.md` (v2.0.0)
 - **Decisions log:** `DECISIONS.md` (authoritative — what was decided and why)
 - **Active Tasks:** `HEARTBEAT.md`
